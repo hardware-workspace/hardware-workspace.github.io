@@ -1,39 +1,42 @@
 # Authentication and security setup
 
-The frontend now requires a Supabase session and an active public.users profile whose ID matches auth.users.id. Roles come from the database, never signup metadata. Production has no demo bypass. Local development offers demo access; public registration is available but does not automatically grant workspace access.
+## Registration policy
 
-## Enable accounts
+Anyone may create an account and choose **member** or **manager** at signup. This is an intentional open-registration policy: neither role requires administrator approval. Email verification may still be required by Supabase authentication settings.
 
-1. Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY locally and in hosting. Never use a service-role/secret key in Vite variables.
-2. Enable Supabase email/password authentication. Configure the production Site URL and allow the local and production origins as recovery redirect URLs.
-3. Create/invite team accounts through Supabase administration. Create matching public.users rows with the auth user UUID, name, email, active status, and approved member/manager role. Existing seed IDs do not grant access.
-4. Enable RLS on public.users. Allow authenticated users to read their own profile; do not allow clients to insert/update roles or active status. Provision these through trusted administration.
-5. Configure email delivery and authentication rate limits in Supabase.
+Only these two workspace roles are accepted. The signup field `requested_role` is mapped to `manager` only when its value is exactly `manager`; all other values default to `member`. Display names may also come from signup metadata. User metadata is editable, so it never grants system-administrator privileges.
 
-## Important remaining limitation
+The frontend verifies the account through `auth.getUser()`. If a trusted database profile exists, its role and active status take precedence. Explicitly disabled profiles remain blocked. While the profile table is absent, or a verified user has no profile yet, the app can use the selected member/manager role for its current sample workspace. This compatibility path does not create persistent database roles or authorize database operations.
 
-App.tsx still initializes tasks/projects/comments from bundled sample data and edits React memory. Changes are not saved across refreshes or shared between users. Authentication is implemented, but a complete persistence migration and database authorization review are still required before real task data is loaded. Frontend permission checks do not replace RLS. Do not put confidential records into bundled seed data.
+## Connect authentication
 
-The supplied original SQL is a reference, not a production migration: it includes sample identities, broad authenticated read policies, and a SECURITY DEFINER function without a pinned search_path. Review and migrate this deliberately against the actual database. In particular, prevent role self-escalation, enforce active membership for every policy, protect manager-only fields in database triggers, require created_by/author_id to equal auth.uid(), and bind real user IDs to auth.users. No database migration was applied by this change.
+1. Configure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` locally and in hosting. The latter accepts a Supabase publishable key. Never use a secret or service-role key in frontend variables.
+2. Enable email/password signup in Supabase. Configure email delivery and authentication rate limits.
+3. Configure authentication redirect URLs, including `https://rohanrajdev77-alt.github.io/hw---tool-/` for GitHub Pages and the local development URL when needed. Verification and recovery callbacks retain the Pages project subpath.
+4. Apply reviewed database profile setup when ready to persist accounts. Keep RLS enabled and allow users to read their own authentication profile. Do not permit direct client writes to profile roles or active status.
 
-## Verification
+## Database profile setup
 
-- npm run build
-- node src/security.test.js
-- npm audit (zero known vulnerabilities at review time)
-- Browser: unauthenticated login and password-recovery navigation checked.
-- Live successful login, disabled-account rejection, recovery email delivery, and database RLS require a provisioned test account; these have not been verified.
+`web/admin_account_setup_proposal.sql` is a proposed setup, not a verified or applied migration. It requires the existing `public.users` schema. It sets the default active flag to true and creates an active profile on signup, storing only the selected member/manager role. The signup trigger ignores metadata claims for administrator access. Later metadata edits do not change a stored profile's role.
 
-Netlify headers apply after deployment; they do not apply to the Vite development server. If using a custom Supabase hostname, update the CSP connect-src allowlist.
+The local setup file includes profile-table creation and backfills only missing profiles as active accounts with the selected member/manager role. Existing profiles are preserved, including explicitly disabled accounts. There is no automatic activation of previously disabled accounts. Review existing schemas, constraints, and policies before applying either setup.
 
-## Self-service registration
+## System administration
 
-The login page now includes Create account (full name, work email, password, confirmation). Registration uses Supabase Auth; enable email signups and email confirmation in the dashboard and configure email redirect URLs. Names are stored as display metadata only; roles never come from that metadata. New registrations do not receive workspace access automatically. An administrator must provision a matching public.users row with the auth UUID and approved role/active status. No automatic profile trigger or role-granting policy has been applied. Registration delivery must be tested with a real user-controlled email address.
+System-administrator membership is separate from the workspace role and is stored in `private.system_admins`. Assign it manually through trusted database administration to the intended verified account. Never accept administrator membership from registration metadata, the signup role selector, or a client request. Manager self-registration does not grant system administration.
 
-## System administration (prepared, not activated)
+The admin page is shown only when `is_system_admin()` returns true. Its user-listing and role/access changes call `admin_list_users` and `admin_update_user`; both functions independently authorize the caller in the database. Missing or failed administrator checks do not grant access. The proposal prevents the account-management RPC from changing system-administrator accounts; those remain managed through trusted administration.
 
-The new AdminPage is displayed only after is_system_admin() returns true. User listing and role/access changes go through admin_list_users and admin_update_user, both of which independently authorize the calling user in the database. Demo and manager accounts cannot open it. System administrator membership is separate from workspace role.
+The profile and administrator setup has not been applied or verified through the connected Supabase project. The connector was unavailable and the browser account could not access the project. Public authentication can be connected independently of this database setup.
 
-web/admin_account_setup_proposal.sql is an unapplied proposal, not a verified migration. Review the actual schema and policies first. It provisions new signups as inactive members, prevents client profile writes, and restricts account management to system admins. The first administrator must be bootstrapped in a trusted database session after registering and verifying their email. No automatic first-user elevation exists. Existing accounts require profile backfill before use.
+## Remaining storage work
 
-The frontend is connected to the selected Supabase project. Database setup and administrator bootstrap have not been verified because the Supabase connector is unavailable and the browser account could not access the project. Test anonymous/member/manager denials, admin success, signup email delivery, disabled accounts, and role changes before deployment. This does not migrate the sample task workspace to persistent database storage.
+`App.tsx` initializes tasks, projects, and comments from bundled sample data and edits React memory. Changes are not saved across refreshes or shared between users. Database setup and task persistence work are still required before real shared task data is loaded. Frontend permission checks do not replace database authorization. Do not put confidential records into bundled sample data.
+
+The original schema/seed SQL under `web/` is a reference, not a production migration. It includes sample identities, broad authenticated read policies, and a `SECURITY DEFINER` function without a pinned `search_path`. Review it against the actual database, enforce stored account roles and active membership in server-side policies, protect manager-only fields in database triggers, require `created_by`/`author_id` to match the authenticated account, and bind real user IDs to `auth.users`.
+
+## Verification and hosting
+
+Run the build, CSV security checks, and the account-role tests when changing authentication. Live signup verification, successful login, member/manager behavior, disabled-account rejection, password recovery, and server administrator denials must be tested against the configured project before treating database setup as verified.
+
+GitHub Pages does not apply the custom headers in `netlify.toml` or `vercel.json`. Those files remain for alternate hosting. Any configured CSP must allow the actual Supabase endpoint used by that host.

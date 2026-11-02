@@ -12,6 +12,14 @@ npm run dev
 
 Configure the Supabase project URL and publishable key using the variable names in `.env.example`. Never commit credentials. Local development offers sample manager/member access; this is disabled in production.
 
+## Accounts and roles
+
+Anyone can create an account and choose **Member** or **Manager** during registration. Both roles can sign in without administrator approval. Supabase may still require email verification, depending on the project's authentication settings.
+
+System administrator is a separate privilege assigned manually through trusted database administration. It is never offered during signup or inferred from signup metadata. The admin page requires the server's `is_system_admin()` check to succeed.
+
+When a verified account has no database profile, the app uses its selected member/manager role for the current sample workspace. Once profile storage is installed, the trusted database profile takes precedence. Explicitly disabled profiles remain blocked. Database setup is still required to persist account roles and to implement shared task storage; sample task changes currently reset on refresh.
+
 ## Build and publish
 
 ```sh
@@ -37,7 +45,7 @@ Changes stay on your computer until you choose to publish. Ask this chat **“pu
 npm run publish:changes -- "Describe the update"
 ```
 
-The publisher checks that you are on `main` in this project and that `origin` points to `https://github.com/rohanrajdev77-alt/hw---tool-.git`. It fetches GitHub's latest `main`, stops if remote changes are missing locally, builds the app, and runs the CSV security checks. It then stages all eligible local changes, creates a commit if needed, and pushes to GitHub. Your connected hosting provider builds new commits automatically once Git integration is enabled. Check the provider's deployment result to confirm that the update is live.
+The publisher checks that you are on `main` in this project and that `origin` points to `https://github.com/rohanrajdev77-alt/hw---tool-.git`. It fetches GitHub's latest `main`, stops if remote changes are missing locally, builds the app, and runs account-access and CSV security checks. It then stages all eligible local changes, creates a commit if needed, and pushes to GitHub. Your connected hosting provider builds new commits automatically once Git integration is enabled. Check the provider's deployment result to confirm that the update is live.
 
 This is an on-demand command, not an automatic push after every edit. Review your changes first: the command includes eligible added files, edits, deletions, and any existing staged changes. It refuses tracked or candidate `.env` files (except `.env.example`), `.netlify`, `.vercel`, `node_modules`, and `dist`. Keep other private data out of source files as well. `.env.local` remains local; hosting configuration belongs in your hosting provider's environment variables.
 
@@ -51,4 +59,4 @@ Checks refresh the local `origin/main` reference and rebuild `dist`, but do not 
 
 ## Current status
 
-Supabase authentication and a database-authorized admin screen are implemented. Database schema/admin bootstrap still need to be applied to the connected project. Task data currently initializes from bundled sample records; edits remain in memory and reset on refresh. See SECURITY_SETUP.md for limitations.
+Open member/manager registration and Supabase authentication are implemented. Database profile setup and manual system-administrator bootstrap still need to be applied and verified against the connected project. Task data currently initializes from bundled sample records; edits remain in memory and reset on refresh. See SECURITY_SETUP.md for limitations.
