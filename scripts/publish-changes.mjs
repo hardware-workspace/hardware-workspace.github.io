@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const expectedOrigin = 'https://github.com/rohanrajdev77-alt/hw---tool-.git';
+const expectedOrigin = 'https://github.com/rohanrajdev77-alt/hardware-tool.git';
 const args = process.argv.slice(2);
 const checkOnly = args.length === 1 && args[0] === '--check';
 if (args.some((arg) => arg.startsWith('--')) && !checkOnly) {
@@ -47,7 +47,7 @@ function verifyTarget() {
   for (const direction of [[], ['--push']]) {
     const urls = git(['remote', 'get-url', ...direction, '--all', 'origin']).output.split(/\r?\n/);
     if (urls.length !== 1 || urls[0] !== expectedOrigin) {
-      throw new Error('The origin fetch/push URL must point only to rohanrajdev77-alt/hw---tool-.');
+      throw new Error('The origin fetch/push URL must point only to rohanrajdev77-alt/hardware-tool.');
     }
   }
 }
