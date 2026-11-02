@@ -39,7 +39,7 @@ $$;
 revoke all on function public.admin_list_users(),public.admin_update_user(uuid,text,boolean) from public,anon;
 grant execute on function public.admin_list_users(),public.admin_update_user(uuid,text,boolean) to authenticated;
 -- Persist the selected signup role once; later client edits cannot change stored roles or access.
-revoke insert,update,delete on public.users from anon,authenticated;
+revoke all on public.users from public,anon,authenticated;
 alter table public.users enable row level security;
 drop policy if exists "Read own authentication profile" on public.users;
 create policy "Read own authentication profile" on public.users for select to authenticated using (id=(select auth.uid()));
