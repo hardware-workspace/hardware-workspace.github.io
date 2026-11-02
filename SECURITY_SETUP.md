@@ -12,7 +12,7 @@ The frontend verifies the account through `auth.getUser()`. If a trusted databas
 
 1. Configure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` locally and in hosting. The latter accepts a Supabase publishable key. Never use a secret or service-role key in frontend variables.
 2. Enable email/password signup in Supabase. Configure email delivery and authentication rate limits.
-3. Configure authentication redirect URLs, including `https://rohanrajdev77-alt.github.io/hw---tool-/` for GitHub Pages and the local development URL when needed. Verification and recovery callbacks retain the Pages project subpath.
+3. Configure authentication redirect URLs, including `https://rohanrajdev77-alt.github.io/hardware-tool/` for GitHub Pages and the local development URL when needed. Verification and recovery callbacks retain the Pages project subpath.
 4. Apply reviewed database profile setup when ready to persist accounts. Keep RLS enabled and allow users to read their own authentication profile. Do not permit direct client writes to profile roles or active status.
 
 ## Database profile setup
