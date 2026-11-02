@@ -1,3 +1,7 @@
+import Dashboard from './Dashboard';
+import EmailPreferences from './EmailPreferences';
+import { useTaskEmailEvents } from './taskEmails';
+import { supabase } from './supabaseClient';
 import { escapeCsvCell } from './security';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
@@ -895,7 +899,7 @@ const NotificationEngine = {
     const emailLogs = [];
     const todayPrefix = new Date().toISOString().slice(0, 10);
 
-    recipients.forEach((recipient) => {
+    recipients.filter(recipient => recipient?.id === task?.assignee_id).forEach((recipient) => {
       if (!recipient) return;
       const alreadySentToday = existingNotifications.some(
         (n) =>
@@ -920,27 +924,8 @@ const NotificationEngine = {
         created_at: new Date().toISOString(),
       });
 
-      const prefMap = {
-        assigned: 'email_task_assigned',
-        due_reminder: 'email_due_reminder',
-        overdue: 'email_overdue',
-        blocked: 'email_blocked',
-        done: 'email_done',
-        comment: 'email_comment',
-        weekly_summary: 'email_weekly_summary',
-        manual_reminder: 'email_task_assigned',
-      };
-      const prefKey = prefMap[eventType];
-      if (!prefKey || recipient.notification_prefs?.[prefKey] !== false) {
-        emailLogs.push({
-          id: `email-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          to: recipient.email,
-          recipientName: recipient.name,
-          subject: `[CommTeam] ${title}`,
-          body: `${body}\n\nDirect Link: https://commteam.company.com/tasks/${task?.id || ''}`,
-          sent_at: new Date().toISOString(),
-        });
-      }
+      // Email delivery is handled by the server queue after a task event is persisted.
+
     });
 
     return { created, emailLogs };
@@ -954,7 +939,7 @@ export default function App({ account, onSignOut }) {
   const initialData = useMemo(() => buildInitialDataset(), []);
 
   const [darkMode, setDarkMode] = useState(false);
-  const [activeTab, setActiveTab] = useState('gantt');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [users, setUsers] = useState(() => [account, ...SEED_USERS.filter((user) => user.id !== account.id)]);
   const currentUserId = account.id;
 
@@ -962,6 +947,15 @@ export default function App({ account, onSignOut }) {
   const [projects, setProjects] = useState(initialData.projects);
   const [tasks, setTasks] = useState(initialData.tasks);
   const [comments, setComments] = useState(initialData.comments);
+  const taskEmailError = useTaskEmailEvents(tasks, comments, account);
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    supabase.rpc('task_assignee_directory').then(({data,error}) => {
+      if(active && !error && data) setUsers(previous => [...data, ...previous.filter(user => !data.some(real => real.id === user.id))]);
+    });
+    return () => { active = false; };
+  }, []);
   const [activityLog, setActivityLog] = useState(initialData.activityLog);
   const [dryRunReport, setDryRunReport] = useState(initialData.dryRunReport);
 
@@ -998,7 +992,7 @@ export default function App({ account, onSignOut }) {
   const [collapsedGroups, setCollapsedGroups] = useState({});
 
   // Modals & Side Panel
-  const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [selectedTaskId, setSelectedTaskId] = useState(() => { const id = new URLSearchParams(location.search).get('task'); return initialData.tasks.some(task => task.id === id) ? id : null; });
   const [blockedModalState, setBlockedModalState] = useState(null);
   const [inProgressModalState, setInProgressModalState] = useState(null);
   const [doneTransitionModalState, setDoneTransitionModalState] = useState(null);
@@ -1460,7 +1454,7 @@ export default function App({ account, onSignOut }) {
     }
     if (dispatched.emailLogs.length > 0) {
       setEmailOutbox((prev) => [...dispatched.emailLogs, ...prev]);
-      pushToast('success', 'Resend Email Dispatched', `Sent ${dispatched.emailLogs.length} email notification(s).`);
+
     }
 
     return true;
@@ -1775,6 +1769,7 @@ export default function App({ account, onSignOut }) {
               {/* Mobile menu toggle or compact nav */}
               <nav className="flex items-center gap-1 bg-stone-100 dark:bg-slate-800/90 p-1 rounded-xl overflow-x-auto max-w-full">
                 {[
+                  { id: 'dashboard', label: 'Dashboard', icon: Activity },
                   { id: 'gantt', label: 'Gantt', icon: Calendar },
                   { id: 'kanban', label: 'Kanban', icon: LayoutGrid },
                   { id: 'team', label: 'Team', icon: Users },
@@ -2077,6 +2072,7 @@ export default function App({ account, onSignOut }) {
         {/* MAIN VIEWPORT CONTENT */}
         {/* ==================================================================== */}
         <main className="flex-1 min-h-0 px-3 lg:px-6 py-2 overflow-hidden flex flex-col">
+          {activeTab === 'dashboard' && <Dashboard tasks={tasks} projects={projects} users={users} currentUser={currentUser} onSelectTask={setSelectedTaskId} onOpenGantt={()=>setActiveTab('gantt')}/>}
           {activeTab === 'gantt' && (
             <GanttView
               productLines={productLines}
@@ -2165,7 +2161,7 @@ export default function App({ account, onSignOut }) {
 
           {activeTab === 'settings' && (
             <div className="flex-1 overflow-y-auto pr-1">
-              <SettingsView
+              <EmailPreferences userId={currentUser.id}/>{taskEmailError && <p role="status" className="p-3 text-amber-800 bg-amber-50 rounded-lg my-3">{taskEmailError}</p>}<SettingsView
                 currentUser={currentUser}
                 productLines={productLines}
                 setProductLines={setProductLines}
@@ -4911,7 +4907,7 @@ function SettingsView({
           { id: 'import', label: '1. Excel Import (17 Rules)', icon: FileSpreadsheet },
           { id: 'lines', label: '2. Projects & Products (Drag to Reorder)', icon: Layers },
           { id: 'users', label: '3. Users & Roles', icon: Users },
-          { id: 'notifications', label: '4. Notification Rules & Outbox', icon: Mail },
+          { id: 'notifications', label: '4. Email delivery', icon: Mail },
           { id: 'sql', label: '5. Supabase SQL & RLS Schema', icon: Database },
         ].map((t) => {
           const Icon = t.icon;
@@ -5146,29 +5142,7 @@ function SettingsView({
         </div>
       )}
 
-      {subTab === 'notifications' && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-stone-200 dark:border-slate-800 space-y-4">
-          <h3 className="font-bold text-base">Resend Email Outbox Log ({emailOutbox.length})</h3>
-          {emailOutbox.length === 0 ? (
-            <p className="text-xs text-slate-400">
-              Assign a task, move a task to Blocked/Done, or click "Send Reminder" to inspect live email payloads.
-            </p>
-          ) : (
-            <div className="space-y-2 max-h-60 overflow-y-auto text-xs">
-              {emailOutbox.map((em) => (
-                <div key={em.id} className="p-3 rounded-xl bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700">
-                  <div className="flex justify-between font-bold">
-                    <span>To: {em.recipientName} &lt;{em.to}&gt;</span>
-                    <span className="text-slate-400">{em.sent_at.slice(11, 19)}</span>
-                  </div>
-                  <div className="text-indigo-600 dark:text-indigo-400 font-semibold mt-0.5">{em.subject}</div>
-                  <p className="text-slate-600 dark:text-slate-300 mt-1">{em.body}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {subTab === 'notifications' && (<p className="bg-white p-5 rounded-xl border text-sm text-slate-500">Use Email notifications above to choose updates for your assigned tasks. Emails are queued on the server; local sample records never send email.</p>)}
 
       {subTab === 'sql' && (
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-stone-200 dark:border-slate-800 space-y-3">
