@@ -1,3 +1,70 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Phone layout: labeled navigation, touch targets, and independently scrolling content. */
+.workspace-shell { height: 100dvh; }
+.mobile-bottom-nav { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.workspace-main, .dashboard-view { overscroll-behavior-y: contain; }
+button:focus-visible, a:focus-visible { outline: 2px solid #6366f1; outline-offset: 3px; }
+@media (max-width: 767px) {
+  .workspace-header { padding-top: max(8px, env(safe-area-inset-top)); }
+  .workspace-header > div { gap: 4px; }
+  .workspace-header button { min-height: 40px; }
+  .workspace-header > div > div:last-child { flex-wrap: nowrap; justify-content: flex-start; }
+  .workspace-header h1 { font-size: 15px; }
+  .mobile-bottom-nav button { min-height: 58px; }
+  .workspace-main { padding-bottom: 8px; }
+  .workspace-filters { max-height: 40dvh; overflow-y: auto; }
+  .mobile-filter-toolbar > div { min-width: 0; width: 100%; }
+  .mobile-filter-toolbar input, .mobile-filter-toolbar select { min-height: 42px; }
+  .gantt-options { max-height: 30dvh; overflow-y: auto; }
+  .gantt-task-label { padding-left: 8px; padding-right: 6px; }
+  .gantt-task-label > div { padding-right: 3px; }
+  .gantt-task-label p { font-size: 10px; }
+  .notification-popover { position: fixed; top: 110px; left: 12px; right: 12px; width: auto; max-height: calc(100dvh - 190px); }
+  .dashboard-view header > div:last-child { width: 100%; }
+  .dashboard-view header select { width: 100%; }
+  .dashboard-stats button { padding: 12px; }
+  .dashboard-stats button:last-child { grid-column: 1 / -1; }
+  .dashboard-stats button p.text-3xl { font-size: 26px; margin-top: 8px; }
+  .dashboard-stats button p.text-xs { display: none; }
+  .task-detail-sheet { height: 100dvh; padding-bottom: env(safe-area-inset-bottom); }
+  .task-detail-sheet > div { padding: 14px; }
+  .task-detail-sheet input, .task-detail-sheet select, .task-detail-sheet textarea { max-width: 100%; }
+  .task-detail-sheet button { min-height: 40px; }
+  .task-detail-sheet .grid-cols-2 { grid-template-columns: minmax(0,1fr); }
+  input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea { font-size: 16px !important; }
+  input[type=checkbox], input[type=radio] { min-width: 18px; min-height: 18px; }
+  .auth-form-wrap { margin-top: 0; padding-top: 16px; }
+  .auth-form-panel { min-height: auto; }
+  .admin-users-table table, .admin-users-table tbody, .admin-users-table tr, .admin-users-table td { display: block; width: 100%; }
+  .admin-users-table thead { display: none; }
+  .admin-users-table tbody tr { padding: 12px 4px; }
+  .admin-users-table td { padding: 6px 16px; }
+  .admin-users-table td:last-child { text-align: left; }
+  .admin-users-table td:last-child button { width: 100%; min-height: 44px; }
+}
+@media (max-width: 767px) {
+  .gantt-group-label { padding-left: 8px; padding-right: 6px; overflow: hidden; }
+  .gantt-group-label > div { min-width: 0; gap: 4px; }
+  .gantt-group-label > div > span:first-of-type { display: none; }
+  .gantt-group-label > div > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gantt-group-label > span { display: none; }
+  .kanban-columns { display: flex; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 8px; }
+  .kanban-columns > div { flex: 0 0 85%; min-width: 0; scroll-snap-align: start; max-height: 58dvh; }
+}
+@media (max-width: 767px) {
+  .settings-scroll h3 { min-width: 0; overflow-wrap: anywhere; }
+  .settings-scroll .flex > div { min-width: 0; max-width: 100%; }
+  .settings-scroll button { white-space: normal; overflow-wrap: anywhere; }
+  .task-detail-sheet span.font-bold { white-space: nowrap; flex-shrink: 0; }
+}
+@media (max-width: 767px) {
+  .kanban-toolbar > div { flex-wrap: wrap; min-width: 0; width: 100%; }
+  .kanban-toolbar button { min-height: 40px; }
+}
+.authenticated-workspace { height: 100dvh; display: flex; flex-direction: column; }
+.authenticated-workspace > .system-admin-bar { flex-shrink: 0; }
+.authenticated-workspace > div:last-child { flex: 1; min-height: 0; }
+.authenticated-workspace .workspace-shell { height: 100%; }

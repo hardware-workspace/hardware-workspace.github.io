@@ -940,6 +940,7 @@ export default function App({ account, onSignOut }) {
   const initialData = useMemo(() => buildInitialDataset(), []);
 
   const [darkMode, setDarkMode] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [users, setUsers] = useState(() => [account, ...SEED_USERS.filter((user) => user.id !== account.id)]);
   useEffect(() => { setUsers(previous => previous.map(user => user.id===account.id ? {...user,name:account.name,email:account.email} : user)); }, [account.id,account.name,account.email]);
@@ -1743,11 +1744,11 @@ export default function App({ account, onSignOut }) {
   // ============================================================================
   return (
     <div className={darkMode ? 'dark' : ''}>
-      <div className="h-screen overflow-hidden bg-stone-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors">
+      <div className="workspace-shell h-screen overflow-hidden bg-stone-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors">
         {/* ==================================================================== */}
         {/* TOP NAVIGATION BAR */}
         {/* ==================================================================== */}
-        <header className="shrink-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-stone-200 dark:border-slate-800 px-3 lg:px-6 py-2">
+        <header className="workspace-header shrink-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-stone-200 dark:border-slate-800 px-3 lg:px-6 py-2">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5">
             {/* Brand & Main Navigation Tabs */}
             <div className="flex items-center justify-between w-full sm:w-auto gap-4">
@@ -1769,7 +1770,7 @@ export default function App({ account, onSignOut }) {
               </div>
 
               {/* Mobile menu toggle or compact nav */}
-              <nav className="flex items-center gap-1 bg-stone-100 dark:bg-slate-800/90 p-1 rounded-xl overflow-x-auto max-w-full">
+              <nav aria-label="Workspace navigation" className="hidden md:flex items-center gap-1 bg-stone-100 dark:bg-slate-800/90 p-1 rounded-xl overflow-x-auto max-w-full">
                 {[
                   { id: 'dashboard', label: 'Dashboard', icon: Activity },
                   { id: 'gantt', label: 'Gantt', icon: Calendar },
@@ -1816,7 +1817,7 @@ export default function App({ account, onSignOut }) {
                 title="Create Project or Product"
               >
                 <FolderPlus className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Create Project/Product</span>
+                <span className="md:hidden">Project</span><span className="hidden md:inline">Create Project/Product</span>
               </button>
 
               <button
@@ -1831,7 +1832,7 @@ export default function App({ account, onSignOut }) {
                 <span>New Task</span>
               </button>
 
-              <div className="flex items-center gap-2 rounded-xl border border-stone-200 dark:border-slate-700 px-3 py-1.5 text-xs">
+              <div className="hidden md:flex items-center gap-2 rounded-xl border border-stone-200 dark:border-slate-700 px-3 py-1.5 text-xs">
                 <Shield className="h-4 w-4 text-indigo-600" />
                 <span>{currentUser.name} · {currentUser.role}</span>
                 <button type="button" onClick={onSignOut} className="font-semibold text-indigo-600 hover:underline">Sign out</button>
@@ -1853,11 +1854,11 @@ export default function App({ account, onSignOut }) {
                 </button>
 
                 {notifOpen && (
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[28rem] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-stone-200 dark:border-slate-800 p-4 z-50">
+                  <div className="notification-popover absolute right-0 mt-2 w-80 sm:w-96 max-h-[28rem] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-stone-200 dark:border-slate-800 p-4 z-50">
                     <div className="flex items-center justify-between pb-3 border-b border-stone-100 dark:border-slate-800">
                       <div>
                         <h3 className="font-semibold text-sm">Notifications ({currentUser.name})</h3>
-                        <p className="text-[11px] text-slate-500">In-App & Resend Adapter Log</p>
+                        <p className="text-[11px] text-slate-500">Workspace updates</p>
                       </div>
                       <button
                         onClick={() =>
@@ -1921,7 +1922,7 @@ export default function App({ account, onSignOut }) {
         {/* SHARED KPI STRIP & FILTER TOOLBAR */}
         {/* ==================================================================== */}
         {(activeTab === 'gantt' || activeTab === 'kanban') && (
-          <div className="shrink-0 px-3 lg:px-6 pt-2 space-y-2">
+          <div className="workspace-filters shrink-0 px-3 lg:px-6 pt-2 space-y-2">
             {/* 6-Card KPI Strip */}
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 sm:gap-2">
               {kpiStats.map((k) => (
@@ -1953,8 +1954,9 @@ export default function App({ account, onSignOut }) {
               ))}
             </div>
 
+            <button aria-expanded={mobileFiltersOpen} onClick={()=>setMobileFiltersOpen(!mobileFiltersOpen)} className="md:hidden w-full flex items-center justify-between bg-white dark:bg-slate-900 border rounded-lg px-3 py-2 text-sm"><span className="flex items-center gap-2"><Filter size={16}/>Search & filters</span>{mobileFiltersOpen?'Hide':'Show'}</button>
             {/* Persistent Filter Toolbar */}
-            <div className="bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-stone-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-2">
+            <div className={`${mobileFiltersOpen ? 'flex' : 'hidden'} md:flex mobile-filter-toolbar bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-stone-200 dark:border-slate-800 shadow-xs flex-wrap items-center justify-between gap-2`}>
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 flex-1">
                 {/* Search Box */}
                 <div className="relative min-w-[150px] sm:min-w-[200px] flex-1 max-w-xs">
@@ -2073,7 +2075,7 @@ export default function App({ account, onSignOut }) {
         {/* ==================================================================== */}
         {/* MAIN VIEWPORT CONTENT */}
         {/* ==================================================================== */}
-        <main className="flex-1 min-h-0 px-3 lg:px-6 py-2 overflow-hidden flex flex-col">
+        <main className="workspace-main flex-1 min-h-0 px-3 lg:px-6 py-2 overflow-hidden flex flex-col">
           {activeTab === 'dashboard' && <Dashboard tasks={tasks} projects={projects} users={users} currentUser={currentUser} onSelectTask={setSelectedTaskId} onOpenGantt={()=>setActiveTab('gantt')}/>}
           {activeTab === 'gantt' && (
             <GanttView
@@ -2162,7 +2164,7 @@ export default function App({ account, onSignOut }) {
           )}
 
           {activeTab === 'settings' && (
-            <div className="flex-1 overflow-y-auto pr-1">
+            <div className="settings-scroll flex-1 overflow-y-auto pr-1">
               <AccountSettings account={currentUser} onUpdated={patch=>setUsers(previous=>previous.map(user=>user.id===currentUser.id?{...user,...patch}:user))} onSignOut={onSignOut}/><EmailPreferences userId={currentUser.id}/>{taskEmailError && <p role="status" className="p-3 text-amber-800 bg-amber-50 rounded-lg my-3">{taskEmailError}</p>}<SettingsView
                 currentUser={currentUser}
                 productLines={productLines}
@@ -2182,6 +2184,9 @@ export default function App({ account, onSignOut }) {
             </div>
           )}
         </main>
+        <nav aria-label="Mobile workspace navigation" className="mobile-bottom-nav md:hidden grid grid-cols-5 shrink-0 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          {[{id:'dashboard',label:'Overview',icon:Activity},{id:'gantt',label:'Gantt',icon:Calendar},{id:'kanban',label:'Board',icon:LayoutGrid},{id:'team',label:'Team',icon:Users},{id:'settings',label:'Settings',icon:Settings}].map(({id,label,icon:Icon})=><button key={id} aria-current={activeTab===id?'page':undefined} onClick={()=>setActiveTab(id)} className={'flex flex-col gap-1 items-center justify-center py-2 text-[11px] font-semibold '+(activeTab===id?'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50':'text-slate-500')}><Icon size={20}/>{label}</button>)}
+        </nav>
 
         {/* ==================================================================== */}
         {/* TASK SIDE PANEL (Fully Responsive Mobile Sheet Modal) */}
@@ -2230,7 +2235,7 @@ export default function App({ account, onSignOut }) {
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
+              className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
             >
               <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
                 <Ban className="w-5 h-5" />
@@ -2313,7 +2318,7 @@ export default function App({ account, onSignOut }) {
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
+              className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
             >
               <div className="flex items-center gap-2 text-sky-600 dark:text-sky-400">
                 <Clock className="w-5 h-5" />
@@ -2374,7 +2379,7 @@ export default function App({ account, onSignOut }) {
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
+              className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
             >
               <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 className="w-5 h-5" />
@@ -2696,7 +2701,7 @@ export default function App({ account, onSignOut }) {
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
+              className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
             >
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-lg">Keyboard & Mouse Shortcuts</h3>
@@ -2751,7 +2756,7 @@ export default function App({ account, onSignOut }) {
         {/* ==================================================================== */}
         {/* FLOATING TOAST STACK */}
         {/* ==================================================================== */}
-        <div className="fixed bottom-5 right-5 z-50 space-y-2 max-w-sm w-full pointer-events-none">
+        <div className="fixed bottom-24 md:bottom-5 right-3 left-3 md:left-auto md:right-5 z-50 space-y-2 max-w-sm md:w-full pointer-events-none">
           {toasts.map((t) => (
             <div
               key={t.id}
@@ -2862,7 +2867,10 @@ function GanttView({
   }, [allTasks]);
   const rowHeight = 96;
   const groupRowHeight = 40;
-  const leftColWidth = 370;
+  const [compactTimeline, setCompactTimeline] = useState(() => window.matchMedia('(max-width: 767px)').matches);
+  const [timelineOptionsOpen, setTimelineOptionsOpen] = useState(false);
+  useEffect(() => {const query=window.matchMedia('(max-width: 767px)');const update=()=>setCompactTimeline(query.matches);query.addEventListener('change',update);return()=>query.removeEventListener('change',update);},[]);
+  const leftColWidth = compactTimeline ? 158 : 370;
 
   const daysArray = useMemo(() => {
     const arr = [];
@@ -3117,8 +3125,9 @@ function GanttView({
 
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+      <button aria-expanded={timelineOptionsOpen} onClick={()=>setTimelineOptionsOpen(!timelineOptionsOpen)} className="md:hidden shrink-0 flex justify-between border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900"><span>Timeline options</span><span>{timelineOptionsOpen?'Hide':'Show'}</span></button>
       {/* Top Gantt Controls Bar: Expand/Collapse + Comprehensive Period Filter (Week, Month, Quarter, Year, Custom) + Alt+Wheel Zoom */}
-      <div className="shrink-0 bg-white dark:bg-slate-900 px-3.5 py-2 rounded-xl border border-stone-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div className={`${timelineOptionsOpen ? 'flex' : 'hidden'} md:flex gantt-options shrink-0 bg-white dark:bg-slate-900 px-3.5 py-2 rounded-xl border border-stone-200 dark:border-slate-800 shadow-sm flex-wrap items-center justify-between gap-2 text-xs`}>
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={onExpandAll}
@@ -3303,7 +3312,7 @@ function GanttView({
                 className="shrink-0 sticky left-0 z-50 bg-stone-100 dark:bg-slate-800 px-4 py-2 font-bold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-300 border-r-2 border-stone-300 dark:border-slate-700 flex items-center justify-between shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
               >
                 <span>Tasks</span>
-                <span className="text-[10px] normal-case tracking-normal font-medium text-slate-500 dark:text-slate-400 max-w-[230px] text-right">
+                <span className="hidden md:inline text-[10px] normal-case tracking-normal font-medium text-slate-500 dark:text-slate-400 max-w-[230px] text-right">
                   Dashed: actual duration · Striped: blocked time
                 </span>
               </div>
@@ -3339,15 +3348,15 @@ function GanttView({
                 className="shrink-0 sticky left-0 z-50 bg-indigo-50 dark:bg-slate-900 px-4 text-[11px] font-bold text-indigo-900 dark:text-indigo-300 border-r-2 border-stone-300 dark:border-slate-700 flex items-center justify-between shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
               >
                 <span>
-                  Daily Weight (
+                  {compactTimeline ? 'Daily weight / 10' : <>Daily Weight (
                   {overlayMemberId === 'all'
                     ? 'All Assignees / 10'
                     : overlayMemberId === 'peak'
                     ? 'Peak Assignee / 10'
                     : `${userMap[overlayMemberId]?.name} / 10`}
-                  )
+                  )</>}
                 </span>
-                <span className="text-[10px] font-normal text-slate-500">Hover breakdown</span>
+                <span className="hidden md:inline text-[10px] font-normal text-slate-500">Hover breakdown</span>
               </div>
               <div className="flex relative">
                 {daysArray.map((d) => {
@@ -3522,7 +3531,7 @@ function GanttView({
                       >
                         <div
                           style={{ width: `${leftColWidth}px`, height: `${groupRowHeight}px` }}
-                          className="sticky left-0 z-30 bg-stone-100 dark:bg-slate-800 px-4 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
+                          className="gantt-group-label sticky left-0 z-30 bg-stone-100 dark:bg-slate-800 px-4 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
                         >
                           <div className="flex items-center gap-2 font-bold text-sm text-indigo-950 dark:text-indigo-200">
                             {plCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -3554,7 +3563,7 @@ function GanttView({
                               >
                                 <div
                                   style={{ width: `${leftColWidth}px`, height: `${groupRowHeight}px` }}
-                                  className="sticky left-0 z-30 bg-stone-50 dark:bg-slate-900 pl-7 pr-4 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
+                                  className="gantt-group-label sticky left-0 z-30 bg-stone-50 dark:bg-slate-900 pl-7 pr-4 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
                                 >
                                   <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">
                                     {projCollapsed ? (
@@ -3613,7 +3622,7 @@ function GanttView({
                                       <div
                                         style={{ width: `${leftColWidth}px`, height: `${rowHeight}px` }}
                                         onClick={() => onSelectTask(task.id)}
-                                        className="sticky left-0 z-30 bg-white dark:bg-slate-900 group-hover:bg-stone-50 dark:group-hover:bg-slate-800/95 pl-10 pr-3 py-2 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] cursor-pointer"
+                                        className="gantt-task-label sticky left-0 z-30 bg-white dark:bg-slate-900 group-hover:bg-stone-50 dark:group-hover:bg-slate-800/95 pl-10 pr-3 py-2 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] cursor-pointer"
                                       >
                                         <div className="min-w-0 flex-1 pr-2 space-y-1">
                                           <div className="text-xs text-slate-800 dark:text-slate-100 font-bold leading-snug line-clamp-2">
@@ -3948,7 +3957,7 @@ function TaskSidePanel({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:w-[500px] bg-white dark:bg-slate-900 h-full shadow-2xl border-l border-stone-200 dark:border-slate-800 flex flex-col justify-between overflow-y-auto cursor-default"
+        className="task-detail-sheet w-full sm:w-[500px] bg-white dark:bg-slate-900 h-full shadow-2xl border-l border-stone-200 dark:border-slate-800 flex flex-col justify-between overflow-y-auto cursor-default"
       >
         <div className="p-5 space-y-5">
           {/* 1. Header */}
@@ -4548,7 +4557,7 @@ function KanbanView({
   return (
     <div className="space-y-3">
       {/* Kanban Sorting Bar */}
-      <div className="bg-white dark:bg-slate-900 px-4 py-2.5 rounded-2xl border border-stone-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div className="kanban-toolbar bg-white dark:bg-slate-900 px-4 py-2.5 rounded-2xl border border-stone-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2">
           <ArrowUpDown className="w-4 h-4 text-indigo-600" />
           <span className="font-bold text-slate-700 dark:text-slate-200">Sort Kanban Cards By:</span>
@@ -4574,12 +4583,12 @@ function KanbanView({
           ))}
         </div>
         <span className="text-[11px] text-slate-400">
-          Drag cards between columns or onto another card to reorder
+          Swipe columns on mobile; open a task to change its status. Drag cards to reorder on desktop
         </span>
       </div>
 
       {/* 4 Kanban Columns */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="kanban-columns grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {columns.map((colStatus) => {
           const colMeta = STATUS_META[colStatus];
           const colTasks = sortTasks(tasks.filter((t) => t.status === colStatus));
@@ -5194,7 +5203,7 @@ function CreateProjectProductModal({ productLines, onClose, onCreateProject, onC
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
+        className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -5325,7 +5334,7 @@ function NewTaskModal({ productLines, projects, tasks, users, currentUser, defau
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
+        className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
       >
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-lg">Create Hardware Engineering Task</h3>
@@ -5551,7 +5560,7 @@ function SplitTaskModal({ task, users, onClose, onSplit }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
+        className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
