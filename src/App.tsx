@@ -1,3 +1,4 @@
+import AccountSettings from './AccountSettings';
 import Dashboard from './Dashboard';
 import EmailPreferences from './EmailPreferences';
 import { useTaskEmailEvents } from './taskEmails';
@@ -941,6 +942,7 @@ export default function App({ account, onSignOut }) {
   const [darkMode, setDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [users, setUsers] = useState(() => [account, ...SEED_USERS.filter((user) => user.id !== account.id)]);
+  useEffect(() => { setUsers(previous => previous.map(user => user.id===account.id ? {...user,name:account.name,email:account.email} : user)); }, [account.id,account.name,account.email]);
   const currentUserId = account.id;
 
   const [productLines, setProductLines] = useState(initialData.productLines);
@@ -2161,7 +2163,7 @@ export default function App({ account, onSignOut }) {
 
           {activeTab === 'settings' && (
             <div className="flex-1 overflow-y-auto pr-1">
-              <EmailPreferences userId={currentUser.id}/>{taskEmailError && <p role="status" className="p-3 text-amber-800 bg-amber-50 rounded-lg my-3">{taskEmailError}</p>}<SettingsView
+              <AccountSettings account={currentUser} onUpdated={patch=>setUsers(previous=>previous.map(user=>user.id===currentUser.id?{...user,...patch}:user))} onSignOut={onSignOut}/><EmailPreferences userId={currentUser.id}/>{taskEmailError && <p role="status" className="p-3 text-amber-800 bg-amber-50 rounded-lg my-3">{taskEmailError}</p>}<SettingsView
                 currentUser={currentUser}
                 productLines={productLines}
                 setProductLines={setProductLines}
