@@ -79,6 +79,8 @@ try {
   }
   console.log('Building the app…');
   run(process.execPath, [npmCli, 'run', 'build']);
+  console.log('Checking registration and administrator access…');
+  run(process.execPath, [path.join(root, 'src', 'accountAccess.test.js')]);
   console.log('Checking CSV export security…');
   run(process.execPath, [path.join(root, 'src', 'security.test.js')]);
   verifyTarget();
