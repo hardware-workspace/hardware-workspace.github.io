@@ -1,0 +1,3 @@
+[functions.send-task-emails]
+verify_jwt = false
+# This worker validates TASK_EMAIL_CRON_SECRET itself; it accepts no user payload.
