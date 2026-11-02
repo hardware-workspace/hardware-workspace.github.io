@@ -1,0 +1,2 @@
+# Netlify reads this file as a Node version; keep its line ending portable.
+.nvmrc text eol=lf
