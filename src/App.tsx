@@ -40,6 +40,7 @@ import {
   Database,
   Layers,
   Eye,
+  EyeOff,
   Archive,
   Sparkles,
   UserCheck,
@@ -1935,8 +1936,8 @@ export default function App({ account, onSignOut }) {
           {workspace.failed && <><button className="ml-3 underline" onClick={workspace.retrySave}>Retry save</button><button className="ml-3 underline" onClick={workspace.reload}>Reload shared copy</button></>}
         </div>}
         {activeTab === 'gantt' && <div className="flex flex-wrap gap-2 px-3 pt-2 text-xs shrink-0">
-          <button className="rounded-lg border px-3 py-2" aria-expanded={ganttControls} onClick={()=>setGanttControls(!ganttControls)}>{ganttControls?'Hide':'Show'} Gantt controls</button>
-          <button className="rounded-lg border px-3 py-2" aria-pressed={ganttExpanded} onClick={()=>{setGanttExpanded(!ganttExpanded);setGanttControls(ganttExpanded);}}>{ganttExpanded?'Exit expanded view':'Expand Gantt'}</button>
+          <button className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2" aria-expanded={ganttControls} onClick={()=>setGanttControls(!ganttControls)}>{ganttControls ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}{ganttControls?'Hide':'Show'} Gantt controls</button>
+          <button className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2" aria-pressed={ganttExpanded} onClick={()=>{setGanttExpanded(!ganttExpanded);setGanttControls(ganttExpanded);}}>{ganttExpanded ? <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" /> : <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />}{ganttExpanded?'Exit expanded view':'Expand Gantt'}</button>
         </div>}
         {workspace.ready && (activeTab === 'kanban' || (activeTab === 'gantt' && ganttControls)) && (
           <div className="workspace-filters shrink-0 px-3 lg:px-6 pt-2 space-y-2">
@@ -2100,7 +2101,7 @@ export default function App({ account, onSignOut }) {
           {activeTab === 'dashboard' && <Dashboard tasks={tasks} projects={projects} users={users} currentUser={currentUser} onSelectTask={setSelectedTaskId} onOpenGantt={()=>setActiveTab('gantt')}/>}
           {activeTab === 'gantt' && (
             <GanttView
-              controlsVisible={ganttControls}
+              controlsVisible={ganttControls || ganttExpanded}
               productLines={productLines}
               projects={projects}
               tasks={filteredTasks}
