@@ -59,6 +59,7 @@ export function useSharedWorkspace(seed, shared) {
         });
         if (error) throw error;
         baseline.current = { revision: data, state: snapshot };
+        conflict.current = false;
         setStatus(latest.current === snapshot ? 'Saved to shared workspace' : 'Saving workspace…');
       } catch (error) {
         conflict.current = true;
@@ -66,10 +67,10 @@ export function useSharedWorkspace(seed, shared) {
           ? 'Someone else saved changes. Your edits are still on this screen. Reload the shared copy before editing again.'
           : error.code === '42501' || error.code === '22023'
           ? error.message
-          : 'Save failed. Your edits are still on this screen. Retry the save or reload the shared copy.');
+          : `Save failed (${error?.code || 'network'}): ${error?.message || 'Connection unavailable'}. Your edits remain on this screen. Retry save when the issue is resolved.`);
       } finally { running.current = false; }
     }
-    timer = setTimeout(save, 180);
+    timer = setTimeout(save, 900);
     return () => { stopped = true; clearTimeout(timer); };
   }, [state, shared, ready, retry]);
 

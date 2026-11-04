@@ -945,7 +945,7 @@ export default function App({ account, onSignOut }) {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [ganttExpanded, setGanttExpanded] = useState(false);
   const [ganttControls, setGanttControls] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('gantt');
   const shared = realAccount(account.id);
   const workspace = useSharedWorkspace(initialData, shared);
   const [users, setUsers] = useState(() => shared ? [account] : [account, ...SEED_USERS.filter((user) => user.id !== account.id)]);
@@ -993,6 +993,7 @@ export default function App({ account, onSignOut }) {
   const [selectedProductLines, setSelectedProductLines] = useState([]);
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [selectedPriorities, setSelectedPriorities] = useState([]);
+  const [selectedCriticalities, setSelectedCriticalities] = useState([]);
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [myTasksOnly, setMyTasksOnly] = useState(false);
@@ -1001,8 +1002,15 @@ export default function App({ account, onSignOut }) {
   const [ganttZoom, setGanttZoom] = useState('week');
   const [zoomScale, setZoomScale] = useState(1);
   const [collapsedGroups, setCollapsedGroups] = useState({});
+  const defaultGroupsSet = useRef(false);
+  useEffect(() => {
+    if (!workspace.ready || defaultGroupsSet.current) return;
+    defaultGroupsSet.current = true;
+    setCollapsedGroups(Object.fromEntries(projects.map((project) => [`proj-${project.id}`, true])));
+  }, [workspace.ready, projects]);
 
   // Modals & Side Panel
+  const [editingProject, setEditingProject] = useState(null);
   const [selectedTaskId, setSelectedTaskId] = useState(() => { const id = new URLSearchParams(location.search).get('task'); return id; });
   const [blockedModalState, setBlockedModalState] = useState(null);
   const [inProgressModalState, setInProgressModalState] = useState(null);
@@ -1073,6 +1081,7 @@ export default function App({ account, onSignOut }) {
     setSelectedProductLines([]);
     setSelectedProjects([]);
     setSelectedPriorities([]);
+    setSelectedCriticalities([]);
     setSelectedStatuses([]);
     setOverdueOnly(false);
     setMyTasksOnly(false);
@@ -1096,16 +1105,20 @@ export default function App({ account, onSignOut }) {
     : projects.some((project) => collapsedGroups[`proj-${project.id}`])
     ? 'Show Tasks'
     : 'All Tasks Visible';
-  const collapseAllGanttGroups = () => {
-    const next = {};
-    productLines.forEach((pl) => {
-      next[`pl-${pl.id}`] = true;
-    });
-    projects.forEach((p) => {
-      next[`proj-${p.id}`] = true;
-    });
-    setCollapsedGroups(next);
-  };
+  const collapseAllGanttGroups = () => setCollapsedGroups((previous) => {
+    const next = { ...previous };
+    if (projects.some((project) => !previous[`proj-${project.id}`])) {
+      projects.forEach((project) => { next[`proj-${project.id}`] = true; });
+    } else if (productLines.some((pl) => !previous[`pl-${pl.id}`])) {
+      productLines.forEach((pl) => { next[`pl-${pl.id}`] = true; });
+    }
+    return next;
+  });
+  const ganttCollapseLabel = projects.some((project) => !collapsedGroups[`proj-${project.id}`])
+    ? 'Hide Tasks'
+    : productLines.some((pl) => !collapsedGroups[`pl-${pl.id}`])
+    ? 'Hide Products'
+    : 'All Collapsed';
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
@@ -1130,6 +1143,8 @@ export default function App({ account, onSignOut }) {
       if (selectedProjects.length > 0 && !selectedProjects.includes(t.project_id)) {
         return false;
       }
+
+      if (selectedCriticalities.length > 0 && !selectedCriticalities.includes(t.criticality)) return false;
 
       if (selectedPriorities.length > 0 && !selectedPriorities.includes(Number(t.priority))) {
         return false;
@@ -1165,6 +1180,7 @@ export default function App({ account, onSignOut }) {
     selectedProductLines,
     selectedProjects,
     selectedPriorities,
+    selectedCriticalities,
     selectedStatuses,
     searchQuery,
     currentUser.id,
@@ -2018,7 +2034,7 @@ export default function App({ account, onSignOut }) {
                     .filter((u) => u.is_active)
                     .map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.name}
+                        {u.name} ({u.role})
                       </option>
                     ))}
                 </select>
@@ -2067,6 +2083,17 @@ export default function App({ account, onSignOut }) {
                   <option value="2">P2</option>
                   <option value="3">P3</option>
                   <option value="4">P4</option>
+                </select>
+
+                <select value={selectedCriticalities[0] || ''}
+                  onChange={(e) => setSelectedCriticalities(e.target.value ? [e.target.value] : [])}
+                  aria-label="Filter by criticality"
+                  className="px-2 py-1 rounded-lg bg-stone-100 dark:bg-slate-800 text-xs font-medium">
+                  <option value="">Criticality</option>
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
                 </select>
 
                 {/* Status Filter */}
@@ -2151,7 +2178,9 @@ export default function App({ account, onSignOut }) {
               onExpandAll={expandAllGanttGroups}
               expandLabel={ganttExpandLabel}
               onCollapseAll={collapseAllGanttGroups}
+              collapseLabel={ganttCollapseLabel}
               onSelectTask={(taskId) => setSelectedTaskId(taskId)}
+              onEditProject={currentUser.role === 'manager' ? (pl) => setEditingProject({ id: pl.id, name: pl.name, description: pl.description || '' }) : null}
               onUpdateTask={updateTask}
               onRequestSplitTask={(task) => setSplitTaskModalTarget(task)}
               pushToast={pushToast}
@@ -2248,6 +2277,20 @@ export default function App({ account, onSignOut }) {
         </nav>
 
         {/* ==================================================================== */}
+        {editingProject && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-label="Edit project">
+          <form onSubmit={(event) => {
+            event.preventDefault();
+            const name = editingProject.name.trim();
+            if (!name) return;
+            setProductLines((previous) => previous.map((pl) => pl.id === editingProject.id ? { ...pl, name, description: editingProject.description.trim() } : pl));
+            setEditingProject(null);
+          }} className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-5 space-y-4 shadow-2xl">
+            <h2 className="text-lg font-bold">Edit project</h2>
+            <label className="block text-sm font-medium">Name<input required value={editingProject.name} onChange={(event) => setEditingProject({ ...editingProject, name: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" /></label>
+            <label className="block text-sm font-medium">Description<textarea value={editingProject.description} onChange={(event) => setEditingProject({ ...editingProject, description: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" rows={3} /></label>
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingProject(null)} className="rounded-lg border px-3 py-2">Cancel</button><button type="submit" className="rounded-lg bg-indigo-600 px-3 py-2 text-white">Save project</button></div>
+          </form>
+        </div>}
         {/* TASK SIDE PANEL (Fully Responsive Mobile Sheet Modal) */}
         {/* ==================================================================== */}
         {selectedTaskId && taskMap[selectedTaskId] && (
@@ -2866,19 +2909,22 @@ function GanttView({
   onExpandAll,
   expandLabel,
   onCollapseAll,
+  collapseLabel,
   onSelectTask,
+  onEditProject,
   onUpdateTask,
   onRequestSplitTask,
   pushToast,
 }) {
   const [overlayMemberId, setOverlayMemberId] = useState('all');
   const [periodPreset, setPeriodPreset] = useState('month'); // 'week' | 'month' | 'quarter' | 'year' | 'custom'
-  const [customStart, setCustomStart] = useState('2026-09-01');
-  const [customEnd, setCustomEnd] = useState('2026-11-30');
+  const [customStart, setCustomStart] = useState(TODAY_CAIRO.slice(0, 7) + '-01');
+  const [customEnd, setCustomEnd] = useState(addCalendarDays(TODAY_CAIRO, 30));
   const [showDependencyArrows, setShowDependencyArrows] = useState(true);
   const [linkingFromTaskId, setLinkingFromTaskId] = useState(null);
 
   const ganttScrollRef = useRef(null);
+  const timelineScrollbarRef = useRef(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   useEffect(() => {
     const element = ganttScrollRef.current;
@@ -2908,26 +2954,31 @@ function GanttView({
 
   // Period Window Calculation (By Week, By Month, By Quarter, By Year, Custom)
   const { timelineStart, totalDays } = useMemo(() => {
-    let start = '2026-10-01';
-    let end = '2026-10-31';
+    const today = new Date(`${TODAY_CAIRO}T00:00:00Z`);
+    const year = today.getUTCFullYear();
+    const month = today.getUTCMonth();
+    const iso = (date) => date.toISOString().slice(0, 10);
+    let start;
+    let end;
     if (periodPreset === 'week') {
-      start = '2026-10-11';
-      end = '2026-10-17';
+      const sundayOffset = today.getUTCDay();
+      start = iso(new Date(Date.UTC(year, month, today.getUTCDate() - sundayOffset)));
+      end = addCalendarDays(start, 6);
     } else if (periodPreset === 'month') {
-      start = '2026-10-01';
-      end = '2026-10-31';
+      start = iso(new Date(Date.UTC(year, month, 1)));
+      end = iso(new Date(Date.UTC(year, month + 1, 0)));
     } else if (periodPreset === 'quarter') {
-      start = '2026-09-01';
-      end = '2026-11-30';
+      const quarterStart = Math.floor(month / 3) * 3;
+      start = iso(new Date(Date.UTC(year, quarterStart, 1)));
+      end = iso(new Date(Date.UTC(year, quarterStart + 3, 0)));
     } else if (periodPreset === 'year') {
-      start = '2026-01-01';
-      end = '2026-12-31';
-    } else if (periodPreset === 'custom') {
-      start = customStart || '2026-09-01';
+      start = `${year}-01-01`;
+      end = `${year}-12-31`;
+    } else {
+      start = customStart || TODAY_CAIRO;
       end = customEnd && customEnd > start ? customEnd : addCalendarDays(start, 30);
     }
-    const count = Math.max(7, Math.min(366, diffCalendarDays(start, end) + 1));
-    return { timelineStart: start, totalDays: count };
+    return { timelineStart: start, totalDays: Math.max(7, Math.min(366, diffCalendarDays(start, end) + 1)) };
   }, [periodPreset, customStart, customEnd]);
 
   // Base cell width multiplied by zoomScale (Enlarged cells & Doubled Task Card Height!)
@@ -2968,6 +3019,18 @@ function GanttView({
     }
     return arr;
   }, [timelineStart, totalDays]);
+
+  const monthGroups = useMemo(() => {
+    const groups = [];
+    daysArray.forEach((day) => {
+      const key = day.iso.slice(0, 7);
+      const last = groups[groups.length - 1];
+      if (last?.key === key) last.days += 1;
+      else groups.push({ key, days: 1, monthIndex: day.monthIndex,
+        label: new Date(`${key}-01T00:00:00Z`).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }) });
+    });
+    return groups;
+  }, [daysArray]);
 
   const scrollToDate = (isoDate) => {
     if (!ganttScrollRef.current) return;
@@ -3220,7 +3283,7 @@ function GanttView({
             title="Shortcut: C"
           >
             <Minimize2 className="w-3.5 h-3.5 text-slate-500" />
-            <span>Collapse All</span>
+            <span>{collapseLabel}</span>
           </button>
 
           <button
@@ -3238,7 +3301,7 @@ function GanttView({
               { id: 'week', label: 'By Week' },
               { id: 'month', label: 'By Month' },
               { id: 'quarter', label: 'By Quarter' },
-              { id: 'year', label: 'By Year (2026)' },
+              { id: 'year', label: `By Year (${TODAY_CAIRO.slice(0, 4)})` },
               { id: 'custom', label: 'Custom' },
             ].map((p) => (
               <button
@@ -3369,15 +3432,18 @@ function GanttView({
       >
         <div
           ref={ganttScrollRef}
-
-          className="overflow-x-auto overflow-y-auto flex-1 min-h-0 relative select-none"
+          onScroll={(event) => {
+            if (timelineScrollbarRef.current && timelineScrollbarRef.current.scrollLeft !== event.currentTarget.scrollLeft)
+              timelineScrollbarRef.current.scrollLeft = event.currentTarget.scrollLeft;
+          }}
+          className="gantt-main-scroll overflow-x-auto overflow-y-auto flex-1 min-h-0 relative select-none"
         >
           <div
             className="min-w-max"
             style={{ width: `${leftColWidth + totalDays * dayWidth}px` }}
           >
             {/* STICKY HEADER ROW 1: DATES (Month Initials + Day Number) */}
-            <div className="flex sticky top-0 z-40 bg-stone-100 dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 shadow-xs h-11">
+            <div className="flex sticky top-0 z-40 bg-stone-100 dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 shadow-xs h-16">
               <div
                 style={{ width: `${leftColWidth}px` }}
                 className="shrink-0 sticky left-0 z-50 bg-stone-100 dark:bg-slate-800 px-4 py-2 font-bold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-300 border-r-2 border-stone-300 dark:border-slate-700 flex items-center justify-between shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
@@ -3387,7 +3453,15 @@ function GanttView({
                   Dashed: actual duration · Striped: blocked time
                 </span>
               </div>
-              <div className="flex relative">
+              <div className="flex flex-col relative">
+                <div className="flex h-5">
+                  {monthGroups.map((group) => <div key={group.key} data-month={group.monthIndex}
+                    style={{ width: `${group.days * dayWidth}px` }}
+                    className="gantt-month-band shrink-0 text-center text-[10px] font-bold border-r border-white/50 dark:border-slate-700">
+                    {group.label}
+                  </div>)}
+                </div>
+                <div className="flex h-11">
                 {daysArray.map((d) => {
                   const isToday = d.iso === TODAY_CAIRO;
                   return (
@@ -3406,18 +3480,17 @@ function GanttView({
                           : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
-                      <span className="gantt-month-name text-[9px] font-extrabold uppercase">
-                        {d.monthShort}
-                      </span>
                       <span className="text-[10px] font-bold">{d.dayNum}</span>
+                      <span className="text-[9px]">{d.weekdayShort}</span>
                     </div>
                   );
                 })}
+                </div>
               </div>
             </div>
 
             {/* STICKY HEADER ROW 2: DAILY PERSON WEIGHT OVERLAY (Per Assignee & All Assignees / 10) */}
-            <div className="flex sticky top-11 z-40 bg-indigo-50/95 dark:bg-slate-900/95 backdrop-blur border-b border-indigo-200/80 dark:border-slate-700 h-8">
+            <div className="flex sticky top-16 z-40 bg-indigo-50/95 dark:bg-slate-900/95 backdrop-blur border-b border-indigo-200/80 dark:border-slate-700 h-8">
               <div
                 style={{ width: `${leftColWidth}px` }}
                 className="shrink-0 sticky left-0 z-50 bg-indigo-50 dark:bg-slate-900 px-4 text-[11px] font-bold text-indigo-900 dark:text-indigo-300 border-r-2 border-stone-300 dark:border-slate-700 flex items-center justify-between shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
@@ -3602,6 +3675,8 @@ function GanttView({
                       <div
                         style={{ height: `${groupRowHeight}px` }}
                         onClick={() => toggleGroup(plKey)}
+                        onContextMenu={(event) => { if (onEditProject) { event.preventDefault(); onEditProject(pl); } }}
+                        title={onEditProject ? 'Right-click to edit project' : undefined}
                         className="flex items-center bg-stone-100/90 dark:bg-slate-800/80 cursor-pointer hover:bg-stone-200/60 dark:hover:bg-slate-800 transition-colors"
                       >
                         <div
@@ -3700,6 +3775,8 @@ function GanttView({
                                       <div
                                         style={{ width: `${leftColWidth}px`, height: `${rowHeight}px` }}
                                         onClick={() => onSelectTask(task.id)}
+                                        onContextMenu={(event) => { event.preventDefault(); onSelectTask(task.id); }}
+                                        title="Click or right-click to open task"
                                         className="gantt-task-label sticky left-0 z-30 bg-white dark:bg-slate-900 group-hover:bg-stone-50 dark:group-hover:bg-slate-800/95 pl-10 pr-3 py-2 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] cursor-pointer"
                                       >
                                         <div className="min-w-0 flex-1 pr-2 space-y-1">
@@ -3977,10 +4054,38 @@ function GanttView({
             </div>
           </div>
         </div>
-
+        <div className="flex shrink-0 border-t border-stone-200 dark:border-slate-700">
+          <div style={{ width: `${leftColWidth}px` }} className="shrink-0 bg-stone-50 dark:bg-slate-900 border-r-2 border-stone-300 dark:border-slate-700" />
+          <div ref={timelineScrollbarRef} onScroll={(event) => {
+            if (ganttScrollRef.current && ganttScrollRef.current.scrollLeft !== event.currentTarget.scrollLeft)
+              ganttScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
+          }} className="timeline-scrollbar flex-1 overflow-x-auto overflow-y-hidden h-5">
+            <div style={{ width: `${totalDays * dayWidth}px`, height: '1px' }} />
+          </div>
+        </div>
       </div>
     </div>
   );
+}
+
+function TaskDraftField({ taskId, field, value, onCommit, multiline = false, className, disabled, rows }) {
+  const [draft, setDraft] = useState(value ?? '');
+  const inputRef = useRef(null);
+  useEffect(() => { if (document.activeElement !== inputRef.current) setDraft(value ?? ''); }, [taskId, value]);
+  const props = { ref: inputRef, value: draft, disabled, className,
+    onChange: (event) => setDraft(event.target.value),
+    onBlur: () => { if (draft !== (value ?? '')) onCommit(taskId, { [field]: draft }); },
+  };
+  return multiline ? <textarea {...props} rows={rows} /> : <input {...props} type="text" />;
+}
+
+function TaskDraftRange({ task, onCommit, disabled }) {
+  const [draft, setDraft] = useState(Number(task.weight) || 1);
+  useEffect(() => setDraft(Number(task.weight) || 1), [task.id, task.weight]);
+  const committed = useRef(Number(task.weight) || 1);
+  useEffect(() => { committed.current = Number(task.weight) || 1; }, [task.id, task.weight]);
+  const commit = () => { if (draft !== committed.current) { committed.current = draft; onCommit(task.id, { weight: draft }); } };
+  return <input type="range" min="1" max="10" disabled={disabled} value={draft} onChange={(event) => setDraft(Number(event.target.value))} onPointerUp={commit} onKeyUp={commit} onBlur={commit} className="w-full accent-indigo-600 cursor-pointer" />;
 }
 
 // ============================================================================
@@ -4013,6 +4118,7 @@ function TaskSidePanel({
   const [commentInput, setCommentInput] = useState('');
   const [showActivity, setShowActivity] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const backdropPointerDown = useRef(false);
 
   // Cascade Filters inside the Dependency Section (Project -> Product -> Task)
   const [depFilterPlId, setDepFilterPlId] = useState('');
@@ -4026,6 +4132,21 @@ function TaskSidePanel({
   const overdue = isTaskOverdue(task);
   const prerequisiteTask = task.depends_on_id ? taskMap[task.depends_on_id] : null;
   const dependentChildren = allTasks.filter((t) => t.depends_on_id === task.id);
+  const auditLabels = { assignee_id: 'assignee', details: 'notes', planned_days: 'planned time', actual_days: 'actual time', blocked_days: 'blocked time', blocked_reason: 'blocked reason', start_date: 'start date', due_date: 'end date', weight: 'daily weight', depends_on_id: 'prerequisite' };
+  const auditValue = (field, value) => {
+    if (field === 'assignee_id') return !value || value === 'none' ? 'Unassigned' : userMap[value]?.name || 'Former team member';
+    if (field === 'depends_on_id') return !value || value === 'none' ? 'None' : taskMap[value]?.title || 'Former task';
+    return value;
+  };
+  const visibleLogs = logs.reduce((result, entry) => {
+    const previous = result[result.length - 1];
+    if (previous && previous.actor_id === entry.actor_id && previous.field === entry.field &&
+        Math.abs(new Date(previous.created_at) - new Date(entry.created_at)) < 10000) {
+      previous.old_value = entry.old_value;
+      previous.count = (previous.count || 1) + 1;
+    } else result.push({ ...entry });
+    return result;
+  }, []);
 
   // Filtered candidate tasks for Dependency dropdowns based on Project & Product filter
   const filteredCandidateTasks = allTasks.filter((t) => {
@@ -4039,7 +4160,8 @@ function TaskSidePanel({
 
   return (
     <div
-      onClick={onClose}
+      onPointerDown={(event) => { backdropPointerDown.current = event.button === 0 && event.target === event.currentTarget; }}
+      onPointerUp={(event) => { if (backdropPointerDown.current && event.target === event.currentTarget) onClose(); backdropPointerDown.current = false; }}
       className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs flex justify-end cursor-pointer"
     >
       <div
@@ -4077,13 +4199,8 @@ function TaskSidePanel({
               </button>
             </div>
 
-            <input
-              type="text"
-              disabled={!canEdit}
-              value={task.title}
-              onChange={(e) => onUpdateTask(task.id, { title: e.target.value })}
-              className="w-full font-bold text-lg text-slate-900 dark:text-white bg-transparent border-b border-transparent focus:border-indigo-500 focus:outline-none disabled:opacity-70"
-            />
+            <TaskDraftField key={`${task.id}:title`} taskId={task.id} field="title" value={task.title} onCommit={onUpdateTask} disabled={!canEdit}
+              className="w-full font-bold text-lg text-slate-900 dark:text-white bg-transparent border-b border-transparent focus:border-indigo-500 focus:outline-none disabled:opacity-70" />
 
             {!canEdit && (
               <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
@@ -4188,15 +4305,7 @@ function TaskSidePanel({
                   {task.weight ?? 5} / 10
                 </span>
               </div>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                disabled={!canEdit}
-                value={task.weight ?? 5}
-                onChange={(e) => onUpdateTask(task.id, { weight: Number(e.target.value) })}
-                className="w-full accent-indigo-600 cursor-pointer"
-              />
+              <TaskDraftRange key={task.id} task={task} onCommit={onUpdateTask} disabled={!canEdit} />
             </div>
 
             <div>
@@ -4443,13 +4552,8 @@ function TaskSidePanel({
                 <label className="text-amber-600 dark:text-amber-400 font-bold block mb-1">
                   Blocked Reason (Required)
                 </label>
-                <input
-                  type="text"
-                  disabled={!canEdit}
-                  value={task.blocked_reason || ''}
-                  onChange={(e) => onUpdateTask(task.id, { blocked_reason: e.target.value })}
-                  className="w-full px-2.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 font-medium"
-                />
+                <TaskDraftField key={`${task.id}:blocked_reason`} taskId={task.id} field="blocked_reason" value={task.blocked_reason || ''} onCommit={onUpdateTask} disabled={!canEdit}
+                  className="w-full px-2.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 font-medium" />
               </div>
             )}
           </div>
@@ -4459,13 +4563,8 @@ function TaskSidePanel({
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
               Engineering Specification & Notes
             </label>
-            <textarea
-              rows={3}
-              disabled={!canEdit}
-              value={task.details || ''}
-              onChange={(e) => onUpdateTask(task.id, { details: e.target.value })}
-              className="w-full rounded-xl bg-stone-50 dark:bg-slate-800/80 border border-stone-200 dark:border-slate-800 p-3 text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
-            />
+            <TaskDraftField key={`${task.id}:details`} taskId={task.id} field="details" value={task.details || ''} onCommit={onUpdateTask} disabled={!canEdit} multiline rows={3}
+              className="w-full rounded-xl bg-stone-50 dark:bg-slate-800/80 border border-stone-200 dark:border-slate-800 p-3 text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60" />
           </div>
 
           {/* 4. Threaded Comments */}
@@ -4525,19 +4624,19 @@ function TaskSidePanel({
               onClick={() => setShowActivity((prev) => !prev)}
               className="flex items-center justify-between w-full text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
             >
-              <span>Activity Audit Log ({logs.length})</span>
+              <span>Activity Audit Log ({visibleLogs.length})</span>
               {showActivity ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </button>
             {showActivity && (
               <div className="mt-2 space-y-1.5 max-h-40 overflow-y-auto text-[11px]">
-                {logs.map((a) => (
+                {visibleLogs.map((a) => (
                   <div key={a.id} className="p-2 rounded-lg bg-stone-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400">
                     <span className="font-semibold text-slate-800 dark:text-slate-200">
                       {userMap[a.actor_id]?.name || 'System'}
                     </span>{' '}
-                    changed <span className="font-mono text-indigo-600 dark:text-indigo-400">{a.field}</span>:{' '}
-                    <span className="line-through opacity-75">{a.old_value}</span> →{' '}
-                    <span className="font-semibold text-slate-900 dark:text-white">{a.new_value}</span>
+                    changed <span className="font-semibold text-indigo-600 dark:text-indigo-400">{auditLabels[a.field] || a.field.replaceAll('_', ' ')}</span>:{' '}
+                    <span className="line-through opacity-75">{auditValue(a.field, a.old_value)}</span> →{' '}
+                    <span className="font-semibold text-slate-900 dark:text-white">{auditValue(a.field, a.new_value)}</span>
                   </div>
                 ))}
               </div>
