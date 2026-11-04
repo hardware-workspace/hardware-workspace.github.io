@@ -18,7 +18,7 @@ Anyone can create an account and choose **Member** or **Manager** during registr
 
 System administrator is a separate privilege assigned manually through trusted database administration. It is never offered during signup or inferred from signup metadata. The admin page requires the server's `is_system_admin()` check to succeed.
 
-When a verified account has no database profile, the app uses its selected member/manager role for the current sample workspace. Once profile storage is installed, the trusted database profile takes precedence. Explicitly disabled profiles remain blocked. Database setup is still required to persist account roles and to implement shared task storage; sample task changes currently reset on refresh.
+The trusted database profile determines access to the production shared workspace. Explicitly disabled profiles remain blocked. Local development's demo accounts use a separate seeded workspace.
 
 ## Build and publish
 
@@ -59,4 +59,4 @@ Checks refresh the local `origin/main` reference and rebuild `dist`, but do not 
 
 ## Current status
 
-Open member/manager registration and Supabase authentication are implemented. Database profile setup and manual system-administrator bootstrap still need to be applied and verified against the connected project. Task data currently initializes from bundled sample records; edits remain in memory and reset on refresh. See SECURITY_SETUP.md for limitations.
+Production uses a Supabase shared workspace. The latest user-provided JSON import contains 15 project groups, 25 products, and 177 tasks; all imported tasks lack schedule dates and are in backlog. The Gantt displays them as unscheduled rows and provides staged expansion plus a product filter. See `web/technical_architecture_ai_handoff_guide.md` for current state and `SECURITY_SETUP.md` for access design. Local demo access still uses bundled sample records.

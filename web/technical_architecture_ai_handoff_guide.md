@@ -1,98 +1,49 @@
-# Communication Team Task Manager — Technical Handoff Guide for Next AI / Engineer
+# Hardware Workspace — AI and engineer handoff
 
-This document explains the complete architecture, custom domain rules, and state structure of the **Communication Team Task Manager** so another AI assistant or developer can immediately extend the frontend (`App.jsx`) or wire it to a live Supabase backend.
+Updated 4 November 2026. Repository: https://github.com/hardware-workspace/hardware-workspace.github.io. Production: https://hardware-workspace.github.io/. Local workspace: `D:\_Projects\hardware tool`.
 
----
+## Current state and immediate issue
 
-## 1. Where the Code Lives
-1. **Frontend Application (`App.jsx`)**:
-   - Located in the primary code editor (`App.jsx`).
-   - Built with **React 18**, **Tailwind CSS**, and **Lucide React** icons in a self-contained single-file architecture (easy to split into `src/components/*` and `src/lib/*` when moving to a multi-file Vite repo).
-   - Contains a deterministic seed generator (`buildInitialDataset()`) that produces all **175 hardware-engineering tasks** across the 15 sheet tabs, pre-wired with dependencies, weights, planned/actual days, and blocked segments.
-2. **Database Schema & RLS (`schema_and_seed.sql`)**:
-   - Full PostgreSQL DDL, Row-Level Security (RLS) policies, Cairo weekend functions, and triggers.
-3. **Dependencies (`package.json`)**:
-   - Ready for `npm install && npm run dev`.
+- The connected Supabase project is `xqhxjolkaqqxqblqvrwg`. Frontend configuration uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (publishable key). Never use a service-role key in frontend code.
+- Production shared workspace was replaced from the user-provided `hardware-tool-projects.json`. The resulting state was revision 7 with 15 project groups, 25 products, and 177 tasks. The earlier 175 production tasks were intentionally cleared. This is database state, separate from Git deployment.
+- All 177 imported tasks lack start and due dates, have zero planned days, status backlog, and no assignee. The current published Gantt filters out undated tasks, so its empty message is misleading. Do not invent scheduling dates.
+- The current `src/App.tsx` change includes undated tasks in the Gantt hierarchy, labels them “Unscheduled,” and lets users open them to set dates. It skips bars and dependency lines without dates. Gantt expansion now proceeds from project groups to products to task rows; the filter bar includes a product filter. `npm run build` passed.
+- `hardware-tool-projects.json` and `production-clear-proof.png` are untracked local files. Review them before any bulk staging. The JSON is an import source, not an app bundle input.
 
----
+## Application layout
 
-## 2. Core Domain & Business Rules Implemented
+- React 18, Vite 6, Tailwind CSS, and Lucide. `src/main.tsx` loads `src/AuthGate.tsx`, which loads `src/App.tsx` or the guarded `src/AdminPage.tsx`.
+- `src/AuthGate.tsx` implements Supabase email/password signup, login, and password recovery. Signup offers Member and Manager without administrator approval. System administrator is assigned separately through trusted database administration.
+- `src/App.tsx` includes Dashboard, Gantt, Kanban, Team, Settings, task/project editing, comments, dependencies, and undo. Account and notification settings are in `src/AccountSettings.tsx` and `src/EmailPreferences.tsx`.
+- The UI's top-level “Projects” are `productLines` / `product_lines`. Nested `projects` records are UI “Products”; each task references a product with `project_id`. Preserve this mapping in imports.
+- `src/sharedWorkspace.ts` reads and saves `productLines`, `projects`, `tasks`, `comments`, and `activityLog` through Supabase RPCs. It polls every three seconds and uses a revision check to reject concurrent overwrites. The UI reports save failures and conflicts. A displayed edit may be unsaved until the save succeeds.
+- `supabase/migrations/202611040001_shared_workspace.sql` defines the private singleton JSON store and authenticated read/save RPCs. Server checks active membership, role, revision, basic record validity, and member edit scope.
+- Local development has a demo manager/member login and a seeded 175-task dataset. It is separate from the production shared workspace; never use demo task counts as proof of production state.
 
-### A. Inverted Naming Hierarchy (`Project → Product → Task`)
-- The database table `product_lines` represents top-level **Projects** in the UI (e.g. `Fire Alarm`, `Madinaty`, `SWM30`).
-- The database table `projects` represents **Products** under a Project (e.g. `Sensor` under `Fire Alarm`).
-- Every **Task** belongs to a **Product** (`project_id`).
-- Users can create either a new Project or a new Product via the orange **"Create Project/Product"** button (`CreateProjectProductModal`).
+## Scheduling and access rules
 
-### B. Cairo Timezone & Weekend Exclusion (Friday & Saturday Off)
-- All dates operate in `Africa/Cairo` (`YYYY-MM-DD`).
-- **Friday (`day === 5`) and Saturday (`day === 6`)** are weekend days off in Egypt:
-  - `isWeekendCairo(dateStr)` shades Friday/Saturday columns on the Gantt chart and marks them `Off` in the Daily Weight row.
-  - `snapToWorkingDay(dateStr, direction)` snaps any weekend start/end date to the nearest Sunday–Thursday working day.
-  - `addDays(dateStr, workingDaysDelta)` and `diffDays(startStr, endStr)` automatically skip Fridays and Saturdays when calculating task end dates from `planned_days`.
+- Dates use the Cairo calendar. Friday and Saturday are off. Planned, actual, and blocked days are distinct.
+- The Gantt has period/zoom controls, task bars, dependencies, and a daily weight view. Undated tasks need explicit dates before they can appear as bars or contribute to scheduled daily weight.
+- Priority P1–P4 is separate from criticality. Task weight is 1–10, with 10 as one person's daily capacity.
+- `src/accountAccess.js` checks verified user/profile and system administrator privileges. The admin UI alone is not the security boundary; server functions must authorize privileged calls.
+- Admin user CRUD code is in `supabase/functions/admin-users` with migration `202611020001_admin_user_crud.sql`. See `supabase/ADMIN_USERS_SETUP.md` for deployment and verification.
+- Email queue/worker code is in `supabase/functions/send-task-emails` with migrations `202611020002_task_emails.sql` and `202611020003_brevo_retry_window.sql`. Brevo was selected, but delivery is not confirmed active. See `supabase/TASK_EMAIL_SETUP.md`; do not claim email delivery without configured sender, secrets, schedule, and an inbox test.
 
-### C. Planned Time vs. Actual Time vs. Blocked Time (All in Working Days)
-- **`planned_days`** (numeric, e.g. `3` or `0.5` days):
-  - Only **Managers** can edit `planned_days`.
-  - Acts as the **main duration driver** on the Gantt chart (`due_date = addDays(start_date, planned_days)`).
-- **`actual_days`** (numeric):
-  - Editable by the **Assigned Member** or **Manager**.
-  - When a task is marked `done` and `actual_days !== planned_days`, the Gantt renders a **dotted comparison bar** (`border-dashed`) showing whether the task finished early (green dotted bar) or exceeded planned time (red dotted bar).
-- **`blocked_days`** (numeric):
-  - When a task is moved to `blocked` (or has blocked days logged), the user enters both a required `blocked_reason` and `blocked_days` (e.g. `2d`).
-  - The Gantt bar renders a **striped amber segment (`⏸ 2d`)** on the bar and extends the effective end date (`getEffectiveEndDate(task)`) by `blocked_days`.
+## Run and publish
 
-### D. Priority (`P1–P4`) Split from Criticality (`Critical`, `High`, `Medium`, `Low`)
-- `priority`: integer `1..4` (`P1` to `P4`).
-- `criticality`: `'critical' | 'high' | 'medium' | 'low'`.
-- Both are displayed on Gantt bars, Kanban cards, and inside the Task Side Panel.
-
-### E. Task Weight (`1–10`) & Daily Person Capacity Overlay (`Weight / 10`)
-- Every task has a `weight` between `1` and `10`.
-- Each team member has a standard daily capacity of **`10` weight per day**.
-- The visual color saturation/opacity of each Gantt bar scales dynamically with `task.weight` via `getWeightBarStyle(status, weight)`.
-- The second sticky header row on the Gantt chart (**Daily Weight Overlay**) calculates the daily load:
-  - **All Assignees (`Sum / 10 + Per Assignee`)**: Shows total combined team weight formatted as `24/10`, `33/10`, etc., with a hover tooltip breaking down each individual assignee's weight (`• Mohamed: 8/10`, `• Abdo: 7/10`).
-  - **Peak Assignee / Day (`Peak / 10`)**: Shows the highest-loaded individual on that day.
-  - **Individual Assignee (`Name / 10`)**: Shows that specific engineer's daily weight (`7/10`, or red if `>10/10`).
-
-### F. Task Dependencies (Gantt Drag-to-Link + Auto-Cascade + Cascade Filter)
-- Each task has `depends_on_id` pointing to its prerequisite task.
-- **Auto-Shift Rule (`cascadeDependentTasks`)**: Whenever a prerequisite task is not `done` yet or its end date shifts, any dependent task is **automatically pushed/dragged to start at the effective end date of the prerequisite task**.
-- **On-Gantt Editing**:
-  - Drag the indigo circular handle (`●`) on the right edge of any Gantt bar and release over another Gantt bar to link them.
-  - Click the red `×` badge in the middle of any dashed SVG dependency wire on the Gantt to unlink it.
-- **In-Card Editing**:
-  - Inside `TaskSidePanel`, the Dependency section uses plain language (*"Wait for this task to finish first"* and *"Tasks that will start after this one finishes"*) and includes a **1. Project → 2. Product → 3. Task** cascade filter.
-
-### G. State Transition Modals & Split Task Feature
-- **Backlog → In Progress**: Opens `inProgressModalState`, requiring the user to enter a kickoff note before starting.
-- **Any Status → Done**: Opens `doneTransitionModalState`, prompting for `actual_days`, a completion note, and a **Next Step**:
-  1. Send a review copy task to another team member.
-  2. Create a related follow-up task.
-  3. Link another existing task as dependent.
-  4. Log completion note only.
-- **Split Task (`SplitTaskModal`)**: Splits any task into **Part 1** and **Part 2** (with Part 2 automatically wired to depend on Part 1).
-
-### H. Multi-Step Undo (`Ctrl + Z`)
-- Every task mutation pushes a snapshot onto `undoHistory` (up to 30 steps).
-- Pressing `Ctrl + Z` (or clicking the `Undo (N)` button in the top bar or bottom toast) steps backward through changes one by one.
-
----
-
-## 3. How to Connect `App.jsx` to Live Supabase in 3 Steps
-
-1. Create a `.env` file with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-2. Run `schema_and_seed.sql` in the Supabase SQL Editor.
-3. In `App.jsx`, replace the local state initializers (`useState(initialData.tasks)`) with `supabase.from('tasks').select('*')` and subscribe to Realtime changes:
-```javascript
-useEffect(() => {
-  const channel = supabase
-    .channel('realtime-comm-team')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
-      // Merge payload.new / payload.old into tasks state
-    })
-    .subscribe();
-  return () => supabase.removeChannel(channel);
-}, []);
+```sh
+npm ci
+copy .env.example .env.local
+npm run dev
+npm run build
+npm run test:auth
+npm run publish:check
 ```
+
+Set the two `VITE_` variables locally; GitHub Actions uses repository variables for Pages. `README.md` describes the publish command. The user submits code on request. Review `git status`, stage only intended files, run checks, push to `main`, and verify Pages. Database imports and SQL deployments are separate from frontend publishing.
+
+## Next work
+
+1. Verify the published site lists all 177 undated tasks as unscheduled rows and that the staged expansion and product filter work.
+2. Let the user supply dates, durations, and assignees intentionally. Do not fabricate a schedule from the import.
+3. Verify live admin CRUD and email deployment independently. Older setup documents contain historical “not connected” statements.

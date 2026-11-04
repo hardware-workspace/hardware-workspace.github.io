@@ -1078,7 +1078,24 @@ export default function App({ account, onSignOut }) {
     setMyTasksOnly(false);
   };
 
-  const expandAllGanttGroups = () => setCollapsedGroups({});
+  const expandAllGanttGroups = () => setCollapsedGroups((previous) => {
+    if (productLines.some((pl) => previous[`pl-${pl.id}`])) {
+      const next = { ...previous };
+      productLines.forEach((pl) => { delete next[`pl-${pl.id}`]; });
+      return next;
+    }
+    if (projects.some((project) => previous[`proj-${project.id}`])) {
+      const next = { ...previous };
+      projects.forEach((project) => { delete next[`proj-${project.id}`]; });
+      return next;
+    }
+    return previous;
+  });
+  const ganttExpandLabel = productLines.some((pl) => collapsedGroups[`pl-${pl.id}`])
+    ? 'Show Products'
+    : projects.some((project) => collapsedGroups[`proj-${project.id}`])
+    ? 'Show Tasks'
+    : 'All Tasks Visible';
   const collapseAllGanttGroups = () => {
     const next = {};
     productLines.forEach((pl) => {
@@ -2013,7 +2030,8 @@ export default function App({ account, onSignOut }) {
                     setSelectedProductLines(e.target.value ? [e.target.value] : []);
                     setSelectedProjects([]);
                   }}
-                  className="px-2 py-1 rounded-lg bg-stone-100 dark:bg-slate-800 text-xs font-medium hidden sm:inline-block"
+                  aria-label="Filter by project"
+                  className="px-2 py-1 rounded-lg bg-stone-100 dark:bg-slate-800 text-xs font-medium"
                 >
                   <option value="">All Projects</option>
                   {productLines.map((pl) => (
@@ -2021,6 +2039,21 @@ export default function App({ account, onSignOut }) {
                       {pl.name}
                     </option>
                   ))}
+                </select>
+
+                {/* Product Filter: limited to the selected project group */}
+                <select
+                  value={selectedProjects[0] || ''}
+                  onChange={(e) => setSelectedProjects(e.target.value ? [e.target.value] : [])}
+                  aria-label="Filter by product"
+                  className="px-2 py-1 rounded-lg bg-stone-100 dark:bg-slate-800 text-xs font-medium max-w-[190px]"
+                >
+                  <option value="">All Products</option>
+                  {projects
+                    .filter((project) => !project.archived && (!selectedProductLines.length || selectedProductLines.includes(project.product_line_id)))
+                    .map((project) => (
+                      <option key={project.id} value={project.id}>{project.name}</option>
+                    ))}
                 </select>
 
                 {/* Priority Filter */}
@@ -2116,6 +2149,7 @@ export default function App({ account, onSignOut }) {
               collapsedGroups={collapsedGroups}
               setCollapsedGroups={setCollapsedGroups}
               onExpandAll={expandAllGanttGroups}
+              expandLabel={ganttExpandLabel}
               onCollapseAll={collapseAllGanttGroups}
               onSelectTask={(taskId) => setSelectedTaskId(taskId)}
               onUpdateTask={updateTask}
@@ -2830,6 +2864,7 @@ function GanttView({
   collapsedGroups,
   setCollapsedGroups,
   onExpandAll,
+  expandLabel,
   onCollapseAll,
   onSelectTask,
   onUpdateTask,
@@ -3036,16 +3071,15 @@ function GanttView({
     return mapByDay;
   }, [allTasks, daysArray]);
 
-  // Group scheduled tasks by Project -> Product -> Task
+  // Keep undated tasks in the hierarchy so they can be scheduled from Gantt.
   const groupedHierarchy = useMemo(() => {
-    const scheduled = tasks.filter((t) => t.start_date && t.due_date);
 
     const groups = productLines
       .map((pl) => {
         const plProjects = projects
           .filter((p) => p.product_line_id === pl.id && !p.archived)
           .map((proj) => {
-            const projTasks = scheduled
+            const projTasks = tasks
               .filter((t) => t.project_id === proj.id)
               .sort((a, b) => a.position - b.position);
             return { ...proj, tasks: projTasks };
@@ -3130,11 +3164,11 @@ function GanttView({
     visibleTaskRows.forEach((r, targetRowIdx) => {
       if (r.type !== 'task') return;
       const t = r.task;
-      if (!t.depends_on_id) return;
+      if (!t.depends_on_id || !t.start_date || !t.due_date) return;
       const sourceRowIdx = indexMap[t.depends_on_id];
       if (sourceRowIdx === undefined) return;
       const sourceTask = taskMap[t.depends_on_id];
-      if (!sourceTask) return;
+      if (!sourceTask?.start_date || !sourceTask?.due_date) return;
 
       const srcCoords = getBarCoordinates(sourceTask);
       const tgtCoords = getBarCoordinates(t);
@@ -3178,7 +3212,7 @@ function GanttView({
             title="Shortcut: E"
           >
             <Maximize2 className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Expand All</span>
+            <span>{expandLabel}</span>
           </button>
           <button
             onClick={onCollapseAll}
@@ -3555,7 +3589,7 @@ function GanttView({
               {groupedHierarchy.length === 0 ? (
                 <div className="py-16 text-center">
                   <Sparkles className="w-10 h-10 text-indigo-400 mx-auto mb-2" />
-                  <p className="font-semibold text-base">No scheduled tasks match your active filters</p>
+                  <p className="font-semibold text-base">No tasks match your active filters</p>
                 </div>
               ) : (
                 groupedHierarchy.map((pl) => {
@@ -3627,7 +3661,10 @@ function GanttView({
                                 proj.tasks.map((task) => {
                                   const assignee = task.assignee_id ? userMap[task.assignee_id] : null;
                                   const overdue = isTaskOverdue(task);
-                                  const { leftPx, widthPx } = getBarCoordinates(task);
+                                  const scheduled = Boolean(task.start_date && task.due_date);
+                                  const { leftPx, widthPx } = scheduled
+                                    ? getBarCoordinates(task)
+                                    : { leftPx: 0, widthPx: 0 };
                                   const pMeta = PRIORITY_META[task.priority] || PRIORITY_META[3];
                                   const cMeta = CRITICALITY_META[task.criticality || 'medium'];
                                   const isDraggingThis = dragState && dragState.taskId === task.id;
@@ -3635,7 +3672,7 @@ function GanttView({
                                   const dependentChildrenCount = dependentCounts[task.id] || 0;
 
                                   const showDottedActual =
-                                    task.status === 'done' &&
+                                    scheduled && task.status === 'done' &&
                                     Number(task.actual_days) > 0 &&
                                     Number(task.actual_days) !== Number(task.planned_days);
                                   const actualEndIso = showDottedActual
@@ -3674,7 +3711,7 @@ function GanttView({
                                           </div>
                                           <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
                                             <span className="font-semibold text-indigo-600 dark:text-indigo-400">
-                                              Plan: {task.planned_days ?? 1}d
+                                              {Number(task.planned_days) > 0 ? `Plan: ${task.planned_days}d` : 'Duration not set'}
                                             </span>
                                             {Number(task.actual_days) > 0 && (
                                               <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
@@ -3737,6 +3774,15 @@ function GanttView({
                                           ))}
                                         </div>
 
+                                        {!scheduled && (
+                                          <button
+                                            type="button"
+                                            onClick={() => onSelectTask(task.id)}
+                                            className="sticky left-3 top-1/2 z-20 -translate-y-1/2 rounded-lg border border-dashed border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-indigo-950 dark:text-indigo-200"
+                                          >
+                                            Unscheduled · Open task to set dates
+                                          </button>
+                                        )}
                                         {showDottedActual && (
                                           <div
                                             style={{
@@ -3757,7 +3803,7 @@ function GanttView({
                                         )}
 
                                         {/* DOUBLED-HEIGHT GANTT BAR (Shows 2-Line Title + 2-Line Details) */}
-                                        <div
+                                        {scheduled && <div
                                           style={{
                                             left: `${leftPx}px`,
                                             width: `${widthPx}px`,
@@ -3916,7 +3962,7 @@ function GanttView({
                                             }}
                                             className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/40 rounded-r-xl"
                                           />
-                                        </div>
+                                        </div>}
                                       </div>
                                     </div>
                                   );

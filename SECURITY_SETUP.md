@@ -6,7 +6,7 @@ Anyone may create an account and choose **member** or **manager** at signup. Thi
 
 Only these two workspace roles are accepted. The signup field `requested_role` is mapped to `manager` only when its value is exactly `manager`; all other values default to `member`. Display names may also come from signup metadata. User metadata is editable, so it never grants system-administrator privileges.
 
-The frontend verifies the account through `auth.getUser()`. If a trusted database profile exists, its role and active status take precedence. Explicitly disabled profiles remain blocked. While the profile table is absent, or a verified user has no profile yet, the app can use the selected member/manager role for its current sample workspace. This compatibility path does not create persistent database roles or authorize database operations.
+The frontend verifies the account through `auth.getUser()`. If a trusted database profile exists, its role and active status take precedence. Explicitly disabled profiles remain blocked. Local demo access uses sample data. Production shared workspace RPCs require an active database profile; signup metadata alone does not authorize database operations.
 
 ## Connect authentication
 
@@ -27,11 +27,11 @@ System-administrator membership is separate from the workspace role and is store
 
 The admin page is shown only when `is_system_admin()` returns true. Its user-listing and role/access changes call `admin_list_users` and `admin_update_user`; both functions independently authorize the caller in the database. Missing or failed administrator checks do not grant access. The proposal prevents the account-management RPC from changing system-administrator accounts; those remain managed through trusted administration.
 
-The profile and administrator setup has not been applied or verified through the connected Supabase project. The connector was unavailable and the browser account could not access the project. Public authentication can be connected independently of this database setup.
+The connected production project uses database profiles and a shared workspace. Verify deployed administrator functions and privileges against the live project before changing access rules. The SQL files in `web/` are historical proposals.
 
-## Remaining storage work
+## Shared workspace storage
 
-`App.tsx` initializes tasks, projects, and comments from bundled sample data and edits React memory. Changes are not saved across refreshes or shared between users. Database setup and task persistence work are still required before real shared task data is loaded. Frontend permission checks do not replace database authorization. Do not put confidential records into bundled sample data.
+`src/sharedWorkspace.ts` reads and saves production tasks, products, comments, and activity through the authenticated RPCs in `supabase/migrations/202611040001_shared_workspace.sql`. Local demo mode still uses bundled sample data. Server-side authorization and revision checks apply to production shared state; frontend permission checks do not replace them. Do not put confidential records into bundled sample data.
 
 The original schema/seed SQL under `web/` is a reference, not a production migration. It includes sample identities, broad authenticated read policies, and a `SECURITY DEFINER` function without a pinned `search_path`. Review it against the actual database, enforce stored account roles and active membership in server-side policies, protect manager-only fields in database triggers, require `created_by`/`author_id` to match the authenticated account, and bind real user IDs to `auth.users`.
 
