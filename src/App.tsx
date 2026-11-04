@@ -3676,7 +3676,7 @@ function GanttView({
                         style={{ height: `${groupRowHeight}px` }}
                         onClick={() => toggleGroup(plKey)}
                         onContextMenu={(event) => { if (onEditProject) { event.preventDefault(); onEditProject(pl); } }}
-                        title={onEditProject ? 'Right-click to edit project' : undefined}
+                        title={onEditProject ? `${pl.description ? `${pl.description} - ` : ''}Right-click to edit project` : pl.description || undefined}
                         className="flex items-center bg-stone-100/90 dark:bg-slate-800/80 cursor-pointer hover:bg-stone-200/60 dark:hover:bg-slate-800 transition-colors"
                       >
                         <div

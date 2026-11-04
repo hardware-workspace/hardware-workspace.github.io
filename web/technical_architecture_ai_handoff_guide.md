@@ -7,7 +7,7 @@ Updated 4 November 2026. Repository: https://github.com/hardware-workspace/hardw
 - The connected Supabase project is `xqhxjolkaqqxqblqvrwg`. Frontend configuration uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (publishable key). Never use a service-role key in frontend code.
 - Production shared workspace was replaced from the user-provided `hardware-tool-projects.json`. The resulting state was revision 7 with 15 project groups, 25 products, and 177 tasks. The earlier 175 production tasks were intentionally cleared. This is database state, separate from Git deployment.
 - All 177 imported tasks lack start and due dates, have zero planned days, status backlog, and no assignee. The current published Gantt filters out undated tasks, so its empty message is misleading. Do not invent scheduling dates.
-- The current `src/App.tsx` change includes undated tasks in the Gantt hierarchy, labels them “Unscheduled,” and lets users open them to set dates. It skips bars and dependency lines without dates. Gantt expansion now proceeds from project groups to products to task rows; the filter bar includes a product filter. `npm run build` passed.
+- The Gantt includes undated tasks as “Unscheduled” rows. It opens on the current Cairo month, shows month bands, and defaults to projects and products with task rows collapsed. Expand and collapse work in stages. The filters include project, product, assignee, and criticality. Right-click opens task details or, for managers, project editing.
 - `hardware-tool-projects.json` and `production-clear-proof.png` are untracked local files. Review them before any bulk staging. The JSON is an import source, not an app bundle input.
 
 ## Application layout
@@ -19,6 +19,10 @@ Updated 4 November 2026. Repository: https://github.com/hardware-workspace/hardw
 - `src/sharedWorkspace.ts` reads and saves `productLines`, `projects`, `tasks`, `comments`, and `activityLog` through Supabase RPCs. It polls every three seconds and uses a revision check to reject concurrent overwrites. The UI reports save failures and conflicts. A displayed edit may be unsaved until the save succeeds.
 - `supabase/migrations/202611040001_shared_workspace.sql` defines the private singleton JSON store and authenticated read/save RPCs. Server checks active membership, role, revision, basic record validity, and member edit scope.
 - Local development has a demo manager/member login and a seeded 175-task dataset. It is separate from the production shared workspace; never use demo task counts as proof of production state.
+
+## Production save repair
+
+On 4 November 2026, task saves returned HTTP 400 / PostgreSQL 21000 because the project enforces safe updates and `save_shared_workspace` updated the singleton table without a WHERE clause. `supabase/migrations/202611040002_shared_workspace_safe_update.sql` adds `where singleton = true` to the function. The equivalent change was applied in the Supabase SQL Editor. A temporary task was created, saved, deleted, and the task count returned to 177. The test revision was restored to 7 to preserve compatibility with a browser tab holding earlier unsaved edits. The app now displays the underlying save error and waits 900 ms between edits.
 
 ## Scheduling and access rules
 
