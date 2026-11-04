@@ -62,4 +62,3 @@ begin
   return current_row.revision + 1;
 end;
 $$;
-
