@@ -1,7 +1,8 @@
+import { useSharedWorkspace } from './sharedWorkspace';
 import AccountSettings from './AccountSettings';
 import Dashboard from './Dashboard';
 import EmailPreferences from './EmailPreferences';
-import { useTaskEmailEvents } from './taskEmails';
+import { realAccount } from './taskEmails';
 import { supabase } from './supabaseClient';
 import { escapeCsvCell } from './security';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -941,16 +942,21 @@ export default function App({ account, onSignOut }) {
 
   const [darkMode, setDarkMode] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [ganttExpanded, setGanttExpanded] = useState(false);
+  const [ganttControls, setGanttControls] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [users, setUsers] = useState(() => [account, ...SEED_USERS.filter((user) => user.id !== account.id)]);
+  const shared = realAccount(account.id);
+  const workspace = useSharedWorkspace(initialData, shared);
+  const [users, setUsers] = useState(() => shared ? [account] : [account, ...SEED_USERS.filter((user) => user.id !== account.id)]);
   useEffect(() => { setUsers(previous => previous.map(user => user.id===account.id ? {...user,name:account.name,email:account.email} : user)); }, [account.id,account.name,account.email]);
   const currentUserId = account.id;
 
-  const [productLines, setProductLines] = useState(initialData.productLines);
-  const [projects, setProjects] = useState(initialData.projects);
-  const [tasks, setTasks] = useState(initialData.tasks);
-  const [comments, setComments] = useState(initialData.comments);
-  const taskEmailError = useTaskEmailEvents(tasks, comments, account);
+  const {productLines, projects, tasks, comments, activityLog} = workspace.state;
+  const setProductLines = workspace.setter('productLines');
+  const setProjects = workspace.setter('projects');
+  const setTasks = workspace.setter('tasks');
+  const setComments = workspace.setter('comments');
+  const setActivityLog = workspace.setter('activityLog');
   useEffect(() => {
     if (!supabase) return;
     let active = true;
@@ -959,10 +965,11 @@ export default function App({ account, onSignOut }) {
     });
     return () => { active = false; };
   }, []);
-  const [activityLog, setActivityLog] = useState(initialData.activityLog);
   const [dryRunReport, setDryRunReport] = useState(initialData.dryRunReport);
 
-  const [notifications, setNotifications] = useState([
+  useEffect(() => { if (shared) setUndoHistory([]); }, [workspace.remoteRevision]);
+
+  const [notifications, setNotifications] = useState(shared ? [] : [
     {
       id: 'notif-seed-1',
       user_id: 'u-mohamed',
@@ -995,7 +1002,7 @@ export default function App({ account, onSignOut }) {
   const [collapsedGroups, setCollapsedGroups] = useState({});
 
   // Modals & Side Panel
-  const [selectedTaskId, setSelectedTaskId] = useState(() => { const id = new URLSearchParams(location.search).get('task'); return initialData.tasks.some(task => task.id === id) ? id : null; });
+  const [selectedTaskId, setSelectedTaskId] = useState(() => { const id = new URLSearchParams(location.search).get('task'); return id; });
   const [blockedModalState, setBlockedModalState] = useState(null);
   const [inProgressModalState, setInProgressModalState] = useState(null);
   const [doneTransitionModalState, setDoneTransitionModalState] = useState(null);
@@ -1302,11 +1309,11 @@ export default function App({ account, onSignOut }) {
       return false;
     }
 
-    if (patch.planned_days !== undefined && currentUser.role !== 'manager') {
+    if (shared && currentUser.role !== 'manager' && Object.keys(patch).some(field => !['status','actual_days','blocked_days','blocked_reason'].includes(field))) {
       pushToast(
         'error',
         'Manager Permission Required',
-        'Only Managers can set or change the Planned Time (Days) of a task.'
+        'Members can update status, actual time and blocked time on assigned tasks.'
       );
       return false;
     }
@@ -1346,7 +1353,7 @@ export default function App({ account, onSignOut }) {
     }
 
     // If this task depends on a prerequisite that isn't Done yet, enforce starting at prerequisite's end day
-    if (updated.depends_on_id) {
+    if ((!shared || currentUser.role === 'manager') && updated.depends_on_id) {
       const prereq = tasks.find((t) => t.id === updated.depends_on_id);
       if (prereq && prereq.status !== 'done' && prereq.start_date) {
         const prereqEnd = getEffectiveEndDate(prereq);
@@ -1379,7 +1386,9 @@ export default function App({ account, onSignOut }) {
     ]);
 
     const baseList = tasks.map((t) => (t.id === taskId ? updated : t));
-    const { updatedList, cascadedCount } = cascadeDependentTasks(baseList, taskId);
+    const { updatedList, cascadedCount } = shared && currentUser.role !== 'manager'
+      ? { updatedList: baseList, cascadedCount: 0 }
+      : cascadeDependentTasks(baseList, taskId);
     setTasks(updatedList);
 
     if (cascadedCount > 0) {
@@ -1613,7 +1622,7 @@ export default function App({ account, onSignOut }) {
     if (!task) return;
 
     const newComment = {
-      id: `cmt-${Date.now()}`,
+      id: crypto.randomUUID(),
       task_id: taskId,
       author_id: currentUser.id,
       body: bodyText.trim(),
@@ -1744,7 +1753,7 @@ export default function App({ account, onSignOut }) {
   // ============================================================================
   return (
     <div className={darkMode ? 'dark' : ''}>
-      <div className="workspace-shell h-screen overflow-hidden bg-stone-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors">
+      <div className={`workspace-shell ${activeTab==='gantt' && ganttExpanded ? 'gantt-expanded' : ''} h-screen overflow-hidden bg-stone-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors`}>
         {/* ==================================================================== */}
         {/* TOP NAVIGATION BAR */}
         {/* ==================================================================== */}
@@ -1921,7 +1930,15 @@ export default function App({ account, onSignOut }) {
         {/* ==================================================================== */}
         {/* SHARED KPI STRIP & FILTER TOOLBAR */}
         {/* ==================================================================== */}
-        {(activeTab === 'gantt' || activeTab === 'kanban') && (
+        {shared && workspace.status && <div role="status" className="shrink-0 px-3 py-1 text-xs bg-indigo-50 text-indigo-900">
+          {workspace.status}
+          {workspace.failed && <><button className="ml-3 underline" onClick={workspace.retrySave}>Retry save</button><button className="ml-3 underline" onClick={workspace.reload}>Reload shared copy</button></>}
+        </div>}
+        {activeTab === 'gantt' && <div className="flex flex-wrap gap-2 px-3 pt-2 text-xs shrink-0">
+          <button className="rounded-lg border px-3 py-2" aria-expanded={ganttControls} onClick={()=>setGanttControls(!ganttControls)}>{ganttControls?'Hide':'Show'} Gantt controls</button>
+          <button className="rounded-lg border px-3 py-2" aria-pressed={ganttExpanded} onClick={()=>{setGanttExpanded(!ganttExpanded);setGanttControls(ganttExpanded);}}>{ganttExpanded?'Exit expanded view':'Expand Gantt'}</button>
+        </div>}
+        {workspace.ready && (activeTab === 'kanban' || (activeTab === 'gantt' && ganttControls)) && (
           <div className="workspace-filters shrink-0 px-3 lg:px-6 pt-2 space-y-2">
             {/* 6-Card KPI Strip */}
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 sm:gap-2">
@@ -2076,9 +2093,14 @@ export default function App({ account, onSignOut }) {
         {/* MAIN VIEWPORT CONTENT */}
         {/* ==================================================================== */}
         <main className="workspace-main flex-1 min-h-0 px-3 lg:px-6 py-2 overflow-hidden flex flex-col">
+          {!workspace.ready ? <p role="status" className="p-5">Loading the shared workspace…</p> : <>
+          {shared && !projects.length && activeTab === 'dashboard' && <p className="mb-2 rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+            {account.role === 'manager' ? 'Create a project and a product to start saving shared tasks.' : 'Your shared workspace is empty. Tasks will appear here once a manager adds them.'}
+          </p>}
           {activeTab === 'dashboard' && <Dashboard tasks={tasks} projects={projects} users={users} currentUser={currentUser} onSelectTask={setSelectedTaskId} onOpenGantt={()=>setActiveTab('gantt')}/>}
           {activeTab === 'gantt' && (
             <GanttView
+              controlsVisible={ganttControls}
               productLines={productLines}
               projects={projects}
               tasks={filteredTasks}
@@ -2115,7 +2137,8 @@ export default function App({ account, onSignOut }) {
                 onUpdateTask={updateTask}
                 onRequestSplitTask={(task) => setSplitTaskModalTarget(task)}
                 onQuickAddTask={(status, title) => {
-                  const firstProj = projects.find((p) => !p.archived) || projects[0];
+                  const firstProj = projects.find((p) => !p.archived);
+                  if (!firstProj) { pushToast('error', 'Create a product first', 'A task needs a product.'); return; }
                   const newTask = {
                     id: `task-${Date.now()}`,
                     project_id: firstProj.id,
@@ -2165,7 +2188,7 @@ export default function App({ account, onSignOut }) {
 
           {activeTab === 'settings' && (
             <div className="settings-scroll flex-1 overflow-y-auto pr-1">
-              <AccountSettings account={currentUser} onUpdated={patch=>setUsers(previous=>previous.map(user=>user.id===currentUser.id?{...user,...patch}:user))} onSignOut={onSignOut}/><EmailPreferences userId={currentUser.id}/>{taskEmailError && <p role="status" className="p-3 text-amber-800 bg-amber-50 rounded-lg my-3">{taskEmailError}</p>}<SettingsView
+              <AccountSettings account={currentUser} onUpdated={patch=>setUsers(previous=>previous.map(user=>user.id===currentUser.id?{...user,...patch}:user))} onSignOut={onSignOut}/><EmailPreferences userId={currentUser.id}/><SettingsView
                 currentUser={currentUser}
                 productLines={productLines}
                 setProductLines={setProductLines}
@@ -2183,6 +2206,7 @@ export default function App({ account, onSignOut }) {
               />
             </div>
           )}
+          </>}
         </main>
         <nav aria-label="Mobile workspace navigation" className="mobile-bottom-nav md:hidden grid grid-cols-5 shrink-0 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           {[{id:'dashboard',label:'Overview',icon:Activity},{id:'gantt',label:'Gantt',icon:Calendar},{id:'kanban',label:'Board',icon:LayoutGrid},{id:'team',label:'Team',icon:Users},{id:'settings',label:'Settings',icon:Settings}].map(({id,label,icon:Icon})=><button key={id} aria-current={activeTab===id?'page':undefined} onClick={()=>setActiveTab(id)} className={'flex flex-col gap-1 items-center justify-center py-2 text-[11px] font-semibold '+(activeTab===id?'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50':'text-slate-500')}><Icon size={20}/>{label}</button>)}
@@ -2191,7 +2215,7 @@ export default function App({ account, onSignOut }) {
         {/* ==================================================================== */}
         {/* TASK SIDE PANEL (Fully Responsive Mobile Sheet Modal) */}
         {/* ==================================================================== */}
-        {selectedTaskId && (
+        {selectedTaskId && taskMap[selectedTaskId] && (
           <TaskSidePanel
             task={tasks.find((t) => t.id === selectedTaskId)}
             allTasks={tasks}
@@ -2790,6 +2814,7 @@ export default function App({ account, onSignOut }) {
 //    Period Filter by Week/Month/Quarter/Year/Custom, Editable Gantt Dependencies & Blocked Segment)
 // ============================================================================
 function GanttView({
+  controlsVisible,
   productLines,
   projects,
   tasks,
@@ -2883,7 +2908,9 @@ function GanttView({
       arr.push({
         iso,
         dayNum: d.getUTCDate(),
-        monthShort: d.toLocaleDateString('en-US', { month: 'short' }),
+        monthShort: d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }),
+        monthIndex: d.getUTCMonth(),
+        monthStart: d.getUTCDate() === 1,
         weekdayShort: d.toLocaleDateString('en-US', { weekday: 'narrow' }),
         isWeekend: dow === 5 || dow === 6,
         isFirstOfMonth: d.getUTCDate() === 1,
@@ -3125,6 +3152,7 @@ function GanttView({
 
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+      {controlsVisible && <>
       <button aria-expanded={timelineOptionsOpen} onClick={()=>setTimelineOptionsOpen(!timelineOptionsOpen)} className="md:hidden shrink-0 flex justify-between border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900"><span>Timeline options</span><span>{timelineOptionsOpen?'Hide':'Show'}</span></button>
       {/* Top Gantt Controls Bar: Expand/Collapse + Comprehensive Period Filter (Week, Month, Quarter, Year, Custom) + Alt+Wheel Zoom */}
       <div className={`${timelineOptionsOpen ? 'flex' : 'hidden'} md:flex gantt-options shrink-0 bg-white dark:bg-slate-900 px-3.5 py-2 rounded-xl border border-stone-200 dark:border-slate-800 shadow-sm flex-wrap items-center justify-between gap-2 text-xs`}>
@@ -3284,7 +3312,8 @@ function GanttView({
         </div>
       </div>
 
-      {/* Main Gantt Card with Alt+Wheel Zoom, Clipped Timeline Column (No Overlap!), & Single Permanently Docked Bottom Horizontal Scrollbar */}
+      </>}
+      {/* Timeline */}
       {/* Main Gantt Card with Alt+Wheel Zoom, Clipped Timeline Column (No Overlap!), & Native Scroll */}
       <div
         onWheel={(e) => {
@@ -3322,8 +3351,12 @@ function GanttView({
                   return (
                     <div
                       key={d.iso}
+                      data-month={d.monthIndex}
+                      data-month-start={d.monthStart}
+                      data-today={isToday}
+                      data-weekend={d.isWeekend}
                       style={{ width: `${dayWidth}px` }}
-                      className={`shrink-0 border-r border-stone-200/60 dark:border-slate-700/50 flex flex-col items-center justify-center leading-tight ${
+                      className={`gantt-month-day shrink-0 border-r border-stone-200/60 dark:border-slate-700/50 flex flex-col items-center justify-center leading-tight ${
                         isToday
                           ? 'bg-rose-100 dark:bg-rose-950/90 text-rose-700 dark:text-rose-300 font-bold'
                           : d.isWeekend
@@ -3331,7 +3364,7 @@ function GanttView({
                           : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
-                      <span className="text-[9px] font-extrabold uppercase text-indigo-600 dark:text-indigo-400">
+                      <span className="gantt-month-name text-[9px] font-extrabold uppercase">
                         {d.monthShort}
                       </span>
                       <span className="text-[10px] font-bold">{d.dayNum}</span>
