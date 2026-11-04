@@ -2847,6 +2847,20 @@ function GanttView({
   useEffect(() => {
     const element = ganttScrollRef.current;
     if (!element) return;
+
+    const handleWheel = (event) => {
+      if (!event.altKey && !event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      const delta = event.deltaY < 0 ? 0.14 : -0.14;
+      setZoomScale((scale) => Math.max(0.6, Math.min(2.2, Number((scale + delta).toFixed(2)))));
+    };
+
+    element.addEventListener('wheel', handleWheel, { passive: false });
+    return () => element.removeEventListener('wheel', handleWheel);
+  }, [setZoomScale]);
+  useEffect(() => {
+    const element = ganttScrollRef.current;
+    if (!element) return;
     const observer = new ResizeObserver(() => setViewportWidth(element.clientWidth));
     observer.observe(element);
     setViewportWidth(element.clientWidth);
@@ -3316,13 +3330,6 @@ function GanttView({
       {/* Timeline */}
       {/* Main Gantt Card with Alt+Wheel Zoom, Clipped Timeline Column (No Overlap!), & Native Scroll */}
       <div
-        onWheel={(e) => {
-          if (e.altKey || e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            const delta = e.deltaY < 0 ? 0.14 : -0.14;
-            setZoomScale((s) => Math.max(0.6, Math.min(2.2, Number((s + delta).toFixed(2)))));
-          }
-        }}
         className="bg-white dark:bg-slate-900 rounded-2xl border border-stone-200 dark:border-slate-800 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col"
       >
         <div
