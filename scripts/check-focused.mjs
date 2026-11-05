@@ -7,6 +7,7 @@ const checks = [
   ['account access', ['src/accountAccess.test.js']],
   ['CSV security', ['src/security.test.js']],
   ['email worker', ['supabase/functions/send-task-emails/handler.test.js']],
+  ['task scheduling', ['src/taskSchedule.test.js']],
 ];
 for (const [name, args] of checks) {
   const result = spawnSync(process.execPath, args, { cwd: root, stdio: 'inherit' });

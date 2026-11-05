@@ -5,6 +5,7 @@ import EmailPreferences from './EmailPreferences';
 import { realAccount } from './taskEmails';
 import { supabase } from './supabaseClient';
 import { escapeCsvCell } from './security';
+import { addTaskDays, snapToTaskWorkingDay, taskDaysBetween, taskHoursOnDate, STANDARD_DAY_HOURS } from './taskSchedule';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Calendar,
@@ -355,9 +356,9 @@ function isTaskOverdue(task) {
 
 function getEffectiveEndDate(task) {
   if (!task || !task.start_date) return null;
-  const baseDue = task.due_date || addDays(task.start_date, task.planned_days || 1);
+  const baseDue = task.due_date || addTaskDays(task, task.start_date, task.planned_days || 1);
   const blockedExtra = Number(task.blocked_days) > 0 ? Number(task.blocked_days) : 0;
-  return blockedExtra > 0 ? addDays(baseDue, blockedExtra) : baseDue;
+  return blockedExtra > 0 ? addTaskDays(task, baseDue, blockedExtra) : baseDue;
 }
 
 function formatShortDate(dateStr) {
@@ -1011,6 +1012,7 @@ export default function App({ account, onSignOut }) {
 
   // Modals & Side Panel
   const [editingProject, setEditingProject] = useState(null);
+  const [editingProduct, setEditingProduct] = useState(null);
   const [selectedTaskId, setSelectedTaskId] = useState(() => { const id = new URLSearchParams(location.search).get('task'); return id; });
   const [blockedModalState, setBlockedModalState] = useState(null);
   const [inProgressModalState, setInProgressModalState] = useState(null);
@@ -1306,10 +1308,10 @@ export default function App({ account, onSignOut }) {
       if (!parentEnd) continue;
 
       updatedList = updatedList.map((child) => {
-        if (child.depends_on_id === parentId) {
+        if (child.depends_on_id === parentId && child.dependencies_enabled !== false && parentTask.dependencies_enabled !== false) {
           if (parentTask.status !== 'done' || !child.start_date || child.start_date < parentEnd) {
-            const nextStart = snapToWorkingDay(parentEnd, 1);
-            const nextDue = addDays(nextStart, child.planned_days || 1);
+            const nextStart = snapToTaskWorkingDay(child, parentEnd);
+            const nextDue = addTaskDays(child, nextStart, child.planned_days || 1);
             if (child.start_date !== nextStart || child.due_date !== nextDue) {
               cascadedCount++;
               queue.push(child.id);
@@ -1365,10 +1367,10 @@ export default function App({ account, onSignOut }) {
     const updated = { ...existing, ...patch, updated_at: new Date().toISOString() };
 
     if (patch.start_date) {
-      updated.start_date = snapToWorkingDay(patch.start_date, 1);
+      updated.start_date = snapToTaskWorkingDay(updated, patch.start_date);
     }
     if (patch.due_date) {
-      updated.due_date = snapToWorkingDay(patch.due_date, 1);
+      updated.due_date = snapToTaskWorkingDay(updated, patch.due_date);
     }
 
     // Planned Time (`planned_days`) is the main duration driver on the Gantt chart
@@ -1376,24 +1378,34 @@ export default function App({ account, onSignOut }) {
       const pDays = Math.max(0.5, Number(patch.planned_days) || 1);
       updated.planned_days = pDays;
       if (updated.start_date) {
-        updated.due_date = addDays(updated.start_date, pDays);
+        updated.due_date = addTaskDays(updated, updated.start_date, pDays);
       }
     } else if (patch.start_date !== undefined && patch.due_date !== undefined) {
-      updated.planned_days = Math.max(0.5, diffDays(updated.start_date, updated.due_date) || 1);
+      updated.planned_days = taskDaysBetween(updated, updated.start_date, updated.due_date);
     } else if (patch.start_date !== undefined && !patch.due_date && updated.planned_days != null) {
-      updated.due_date = addDays(updated.start_date, updated.planned_days);
+      updated.due_date = addTaskDays(updated, updated.start_date, updated.planned_days);
     } else if (patch.due_date !== undefined && updated.start_date) {
-      updated.planned_days = Math.max(0.5, diffDays(updated.start_date, updated.due_date) || 1);
+      updated.planned_days = taskDaysBetween(updated, updated.start_date, updated.due_date);
+    }
+
+    if (['extra_hours_per_day', 'friday_hours', 'saturday_hours'].some((field) => patch[field] !== undefined)) {
+      for (const field of ['extra_hours_per_day', 'friday_hours', 'saturday_hours']) {
+        updated[field] = Math.max(0, Math.min(field === 'extra_hours_per_day' ? 15.5 : 16, Number(updated[field]) || 0));
+      }
+      if (updated.start_date) {
+        updated.start_date = snapToTaskWorkingDay(updated, updated.start_date);
+        if (Number(updated.planned_days) > 0) updated.due_date = addTaskDays(updated, updated.start_date, updated.planned_days);
+      }
     }
 
     // If this task depends on a prerequisite that isn't Done yet, enforce starting at prerequisite's end day
-    if ((!shared || currentUser.role === 'manager') && updated.depends_on_id) {
+    if ((!shared || currentUser.role === 'manager') && updated.dependencies_enabled !== false && updated.depends_on_id) {
       const prereq = tasks.find((t) => t.id === updated.depends_on_id);
-      if (prereq && prereq.status !== 'done' && prereq.start_date) {
+      if (prereq && prereq.dependencies_enabled !== false && prereq.status !== 'done' && prereq.start_date) {
         const prereqEnd = getEffectiveEndDate(prereq);
         if (prereqEnd && (!updated.start_date || updated.start_date < prereqEnd)) {
-          updated.start_date = snapToWorkingDay(prereqEnd, 1);
-          updated.due_date = addDays(updated.start_date, updated.planned_days || 1);
+          updated.start_date = snapToTaskWorkingDay(updated, prereqEnd);
+          updated.due_date = addTaskDays(updated, updated.start_date, updated.planned_days || 1);
         }
       }
     }
@@ -1805,7 +1817,7 @@ export default function App({ account, onSignOut }) {
                       CommTeam Task Manager
                     </h1>
                     <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700 dark:bg-teal-950/80 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hidden md:inline">
-                      Cairo · Fri/Sat Off
+                      Cairo · Weekend hours optional
                     </span>
                   </div>
 
@@ -2181,6 +2193,7 @@ export default function App({ account, onSignOut }) {
               collapseLabel={ganttCollapseLabel}
               onSelectTask={(taskId) => setSelectedTaskId(taskId)}
               onEditProject={currentUser.role === 'manager' ? (pl) => setEditingProject({ id: pl.id, name: pl.name, description: pl.description || '' }) : null}
+              onEditProduct={currentUser.role === 'manager' ? (product) => setEditingProduct({ id: product.id, name: product.name, description: product.description || '' }) : null}
               onUpdateTask={updateTask}
               onRequestSplitTask={(task) => setSplitTaskModalTarget(task)}
               pushToast={pushToast}
@@ -2289,6 +2302,20 @@ export default function App({ account, onSignOut }) {
             <label className="block text-sm font-medium">Name<input required value={editingProject.name} onChange={(event) => setEditingProject({ ...editingProject, name: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" /></label>
             <label className="block text-sm font-medium">Description<textarea value={editingProject.description} onChange={(event) => setEditingProject({ ...editingProject, description: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" rows={3} /></label>
             <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingProject(null)} className="rounded-lg border px-3 py-2">Cancel</button><button type="submit" className="rounded-lg bg-indigo-600 px-3 py-2 text-white">Save project</button></div>
+          </form>
+        </div>}
+        {editingProduct && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-label="Edit product">
+          <form onSubmit={(event) => {
+            event.preventDefault();
+            const name = editingProduct.name.trim();
+            if (!name) return;
+            setProjects((previous) => previous.map((product) => product.id === editingProduct.id ? { ...product, name, description: editingProduct.description.trim() } : product));
+            setEditingProduct(null);
+          }} className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-5 space-y-4 shadow-2xl">
+            <h2 className="text-lg font-bold">Edit product</h2>
+            <label className="block text-sm font-medium">Name<input required value={editingProduct.name} onChange={(event) => setEditingProduct({ ...editingProduct, name: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" /></label>
+            <label className="block text-sm font-medium">Description<textarea value={editingProduct.description} onChange={(event) => setEditingProduct({ ...editingProduct, description: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" rows={3} /></label>
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingProduct(null)} className="rounded-lg border px-3 py-2">Cancel</button><button type="submit" className="rounded-lg bg-indigo-600 px-3 py-2 text-white">Save product</button></div>
           </form>
         </div>}
         {/* TASK SIDE PANEL (Fully Responsive Mobile Sheet Modal) */}
@@ -2912,6 +2939,7 @@ function GanttView({
   collapseLabel,
   onSelectTask,
   onEditProject,
+  onEditProduct,
   onUpdateTask,
   onRequestSplitTask,
   pushToast,
@@ -2987,10 +3015,10 @@ function GanttView({
   const dependentCounts = useMemo(() => {
     const counts = {};
     allTasks.forEach((task) => {
-      if (task.depends_on_id) counts[task.depends_on_id] = (counts[task.depends_on_id] || 0) + 1;
+      if (task.dependencies_enabled !== false && task.depends_on_id && taskMap[task.depends_on_id]?.dependencies_enabled !== false) counts[task.depends_on_id] = (counts[task.depends_on_id] || 0) + 1;
     });
     return counts;
-  }, [allTasks]);
+  }, [allTasks, taskMap]);
   const rowHeight = 96;
   const groupRowHeight = 40;
   const [compactTimeline, setCompactTimeline] = useState(() => window.matchMedia('(max-width: 767px)').matches);
@@ -3061,8 +3089,8 @@ function GanttView({
         if (t) {
           if (dragState.mode === 'move') {
             const rawNewStart = addCalendarDays(dragState.origStart, dragState.deltaDays);
-            const snappedStart = snapToWorkingDay(rawNewStart, dragState.deltaDays >= 0 ? 1 : -1);
-            const newDue = addDays(snappedStart, t.planned_days || 1);
+            const snappedStart = snapToTaskWorkingDay(t, rawNewStart);
+            const newDue = addTaskDays(t, snappedStart, t.planned_days || 1);
             onUpdateTask(
               t.id,
               { start_date: snappedStart, due_date: newDue },
@@ -3108,7 +3136,7 @@ function GanttView({
       const w = Number(t.weight) || 5;
       const endIso = getEffectiveEndDate(t) || t.due_date;
       daysArray.forEach((d) => {
-        if (d.isWeekend) return;
+        if (d.isWeekend && !taskHoursOnDate(t, d.iso)) return;
         if (d.iso >= t.start_date && d.iso <= endIso) {
           const cell = mapByDay[d.iso];
           if (!cell.byUser[t.assignee_id]) {
@@ -3199,7 +3227,7 @@ function GanttView({
         endIso = addCalendarDays(dragState.origDue, dragState.deltaDays);
       } else if (dragState.mode === 'resize_right') {
         const tempPlanned = Math.max(0.5, Number(dragState.origPlanned) + dragState.deltaDays);
-        endIso = addDays(startIso, tempPlanned);
+        endIso = addTaskDays(task, startIso, tempPlanned);
       } else if (dragState.mode === 'resize_left') {
         startIso = addCalendarDays(dragState.origStart, dragState.deltaDays);
       }
@@ -3227,11 +3255,11 @@ function GanttView({
     visibleTaskRows.forEach((r, targetRowIdx) => {
       if (r.type !== 'task') return;
       const t = r.task;
-      if (!t.depends_on_id || !t.start_date || !t.due_date) return;
+      if (t.dependencies_enabled === false || !t.depends_on_id || !t.start_date || !t.due_date) return;
       const sourceRowIdx = indexMap[t.depends_on_id];
       if (sourceRowIdx === undefined) return;
       const sourceTask = taskMap[t.depends_on_id];
-      if (!sourceTask?.start_date || !sourceTask?.due_date) return;
+      if (!sourceTask?.start_date || !sourceTask?.due_date || sourceTask.dependencies_enabled === false) return;
 
       const srcCoords = getBarCoordinates(sourceTask);
       const tgtCoords = getBarCoordinates(t);
@@ -3508,7 +3536,7 @@ function GanttView({
               </div>
               <div className="flex relative">
                 {daysArray.map((d) => {
-                  if (d.isWeekend) {
+                  if (d.isWeekend && !dailyOverlayData[d.iso]?.totalAllLoad) {
                     return (
                       <div
                         key={d.iso}
@@ -3709,6 +3737,8 @@ function GanttView({
                               <div
                                 style={{ height: `${groupRowHeight}px` }}
                                 onClick={() => toggleGroup(projKey)}
+                                onContextMenu={(event) => { if (onEditProduct) { event.preventDefault(); onEditProduct(proj); } }}
+                                title={onEditProduct ? 'Right-click to edit product' : proj.description || undefined}
                                 className="flex items-center bg-stone-50/90 dark:bg-slate-900/90 cursor-pointer hover:bg-stone-100 dark:hover:bg-slate-800/50"
                               >
                                 <div
@@ -3743,7 +3773,7 @@ function GanttView({
                                   const pMeta = PRIORITY_META[task.priority] || PRIORITY_META[3];
                                   const cMeta = CRITICALITY_META[task.criticality || 'medium'];
                                   const isDraggingThis = dragState && dragState.taskId === task.id;
-                                  const depTask = task.depends_on_id ? taskMap[task.depends_on_id] : null;
+                                  const depTask = task.dependencies_enabled !== false && task.depends_on_id ? taskMap[task.depends_on_id] : null;
                                   const dependentChildrenCount = dependentCounts[task.id] || 0;
 
                                   const showDottedActual =
@@ -3751,7 +3781,7 @@ function GanttView({
                                     Number(task.actual_days) > 0 &&
                                     Number(task.actual_days) !== Number(task.planned_days);
                                   const actualEndIso = showDottedActual
-                                    ? addDays(task.start_date, task.actual_days)
+                                    ? addTaskDays(task, task.start_date, task.actual_days)
                                     : null;
                                   const actualSpanDays = actualEndIso
                                     ? Math.max(1, diffCalendarDays(task.start_date, actualEndIso) + 1)
@@ -3900,6 +3930,11 @@ function GanttView({
                                           }}
                                           onMouseUp={(e) => {
                                             if (linkingFromTaskId && linkingFromTaskId !== task.id) {
+                                              if (task.dependencies_enabled === false || taskMap[linkingFromTaskId]?.dependencies_enabled === false) {
+                                                setLinkingFromTaskId(null);
+                                                pushToast('info', 'Dependencies disabled', 'Enable dependencies on both tasks before linking.');
+                                                return;
+                                              }
                                               e.stopPropagation();
                                               onUpdateTask(
                                                 task.id,
@@ -4004,6 +4039,10 @@ function GanttView({
                                               <div
                                                 onMouseDown={(e) => {
                                                   e.stopPropagation();
+                                                  if (task.dependencies_enabled === false) {
+                                                    pushToast('info', 'Dependencies disabled', 'Enable dependencies for this task before linking.');
+                                                    return;
+                                                  }
                                                   setLinkingFromTaskId(task.id);
                                                   pushToast(
                                                     'info',
@@ -4079,6 +4118,14 @@ function TaskDraftField({ taskId, field, value, onCommit, multiline = false, cla
   return multiline ? <textarea {...props} rows={rows} /> : <input {...props} type="text" />;
 }
 
+function TaskDraftNumber({ taskId, field, value, onCommit, disabled, className }) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [taskId, value]);
+  return <input type="number" min="0" max={field === 'extra_hours_per_day' ? 15.5 : 16} step="0.5" value={draft} disabled={disabled} className={className}
+    onChange={(event) => setDraft(event.target.value)}
+    onBlur={() => { const next = Math.max(0, Math.min(field === 'extra_hours_per_day' ? 15.5 : 16, Number(draft) || 0)); if (next !== Number(value)) onCommit(taskId, { [field]: next }); setDraft(String(next)); }} />;
+}
+
 function TaskDraftRange({ task, onCommit, disabled }) {
   const [draft, setDraft] = useState(Number(task.weight) || 1);
   useEffect(() => setDraft(Number(task.weight) || 1), [task.id, task.weight]);
@@ -4132,7 +4179,7 @@ function TaskSidePanel({
   const overdue = isTaskOverdue(task);
   const prerequisiteTask = task.depends_on_id ? taskMap[task.depends_on_id] : null;
   const dependentChildren = allTasks.filter((t) => t.depends_on_id === task.id);
-  const auditLabels = { assignee_id: 'assignee', details: 'notes', planned_days: 'planned time', actual_days: 'actual time', blocked_days: 'blocked time', blocked_reason: 'blocked reason', start_date: 'start date', due_date: 'end date', weight: 'daily weight', depends_on_id: 'prerequisite' };
+  const auditLabels = { dependencies_enabled: 'dependencies enabled', extra_hours_per_day: 'extra hours per regular day', friday_hours: 'Friday hours', saturday_hours: 'Saturday hours', assignee_id: 'assignee', details: 'notes', planned_days: 'planned time', actual_days: 'actual time', blocked_days: 'blocked time', blocked_reason: 'blocked reason', start_date: 'start date', due_date: 'end date', weight: 'daily weight', depends_on_id: 'prerequisite' };
   const auditValue = (field, value) => {
     if (field === 'assignee_id') return !value || value === 'none' ? 'Unassigned' : userMap[value]?.name || 'Former team member';
     if (field === 'depends_on_id') return !value || value === 'none' ? 'None' : taskMap[value]?.title || 'Former task';
@@ -4310,7 +4357,7 @@ function TaskSidePanel({
 
             <div>
               <label className="text-slate-500 dark:text-slate-400 font-medium block mb-1">
-                Start Date (Fri/Sat Skipped)
+                Start Date (per task work schedule)
               </label>
               <input
                 type="date"
@@ -4392,9 +4439,31 @@ function TaskSidePanel({
               </div>
             </div>
 
+            <div className="col-span-2 rounded-xl border border-stone-200 dark:border-slate-700 p-3 space-y-2">
+              <div className="font-bold text-xs">Work hours and overtime</div>
+              <p className="text-[11px] text-slate-500">A regular workday is {STANDARD_DAY_HOURS} hours. Weekend hours are optional and count toward the planned duration.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  ['extra_hours_per_day', 'Extra hours / regular day'],
+                  ['friday_hours', 'Friday work hours'],
+                  ['saturday_hours', 'Saturday work hours'],
+                ].map(([field, label]) => <label key={field} className="text-[11px] font-semibold">{label}
+                  <TaskDraftNumber key={`${task.id}:${field}`} taskId={task.id} field={field} value={task[field] || 0} onCommit={onUpdateTask} disabled={currentUser.role !== 'manager'} className="mt-1 w-full rounded-lg border p-2 bg-white dark:bg-slate-900" />
+                </label>)}
+              </div>
+            </div>
+
+            <label className="col-span-2 flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <input type="checkbox" checked={task.dependencies_enabled !== false} disabled={currentUser.role !== 'manager'}
+                onChange={(event) => onUpdateTask(task.id, { dependencies_enabled: event.target.checked })}
+                className="accent-indigo-600" />
+              Enable task dependencies
+            </label>
+            {task.dependencies_enabled === false && <p className="col-span-2 text-[11px] text-slate-500">Existing links are kept, but they will not move dates until dependencies are enabled again.</p>}
+
             {/* FRIENDLY TASK DEPENDENCY SECTION WITH PROJECT -> PRODUCT -> TASK FILTER */}
-            <div className="col-span-2 p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-700 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+            <details open className="col-span-2 p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-700 space-y-4">
+              <summary className="flex flex-wrap items-center justify-between gap-2 cursor-pointer" title="Show or hide dependency controls. Existing links remain active.">
                 <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100">
                   <GitBranch className="w-4 h-4 text-indigo-600" />
                   <span>Task dependencies</span>
@@ -4402,7 +4471,8 @@ function TaskSidePanel({
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
                   Dates adjust automatically
                 </span>
-              </div>
+              </summary>
+              <fieldset disabled={task.dependencies_enabled === false} className="space-y-4 disabled:opacity-50">
 
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Choose what must finish first and what follows this task.
@@ -4545,7 +4615,8 @@ function TaskSidePanel({
                   </div>
                 )}
               </div>
-            </div>
+              </fieldset>
+            </details>
 
             {task.status === 'blocked' && (
               <div className="col-span-2">
@@ -4841,7 +4912,7 @@ function KanbanView({
                   const pMeta = PRIORITY_META[task.priority] || PRIORITY_META[3];
                   const cMeta = CRITICALITY_META[task.criticality || 'medium'];
                   const cCount = commentCounts[task.id] || 0;
-                  const depTask = task.depends_on_id ? taskMap[task.depends_on_id] : null;
+                  const depTask = task.dependencies_enabled !== false && task.depends_on_id ? taskMap[task.depends_on_id] : null;
                   const isBeingDragged = draggedTaskId === task.id;
 
                   return (
@@ -5511,6 +5582,9 @@ function NewTaskModal({ productLines, projects, tasks, users, currentUser, defau
   const [status, setStatus] = useState(defaultStatus || 'backlog');
   const [startDate, setStartDate] = useState(TODAY_CAIRO);
   const [plannedDays, setPlannedDays] = useState(3);
+  const [extraHoursPerDay, setExtraHoursPerDay] = useState(0);
+  const [fridayHours, setFridayHours] = useState(0);
+  const [saturdayHours, setSaturdayHours] = useState(0);
   const [dependsOnId, setDependsOnId] = useState('');
 
   return (
@@ -5629,7 +5703,7 @@ function NewTaskModal({ productLines, projects, tasks, users, currentUser, defau
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(snapToWorkingDay(e.target.value, 1))}
+                onChange={(e) => setStartDate(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-slate-800"
               />
             </div>
@@ -5656,6 +5730,19 @@ function NewTaskModal({ productLines, projects, tasks, users, currentUser, defau
                 onChange={(e) => setWeight(Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
                 className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-slate-800 font-bold"
               />
+            </div>
+          </div>
+
+          <div className="rounded-xl border p-3 space-y-2">
+            <p className="font-semibold text-slate-600">Work hours: {STANDARD_DAY_HOURS}h per regular day</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {[
+                ['Extra hours / regular day', extraHoursPerDay, setExtraHoursPerDay],
+                ['Friday hours', fridayHours, setFridayHours],
+                ['Saturday hours', saturdayHours, setSaturdayHours],
+              ].map(([label, value, setter]) => <label key={label} className="font-semibold text-slate-500">{label}
+                <input type="number" min="0" max={label === 'Extra hours / regular day' ? 15.5 : 16} step="0.5" value={value} onChange={(event) => setter(event.target.value)} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" />
+              </label>)}
             </div>
           </div>
 
@@ -5688,8 +5775,13 @@ function NewTaskModal({ productLines, projects, tasks, users, currentUser, defau
             onClick={() => {
               if (!title.trim()) return;
               const pDays = Math.max(0.5, Number(plannedDays) || 1);
-              const snappedStart = snapToWorkingDay(startDate, 1);
-              const computedDue = addDays(snappedStart, pDays);
+              const workSchedule = {
+                extra_hours_per_day: Math.max(0, Math.min(15.5, Number(extraHoursPerDay) || 0)),
+                friday_hours: Math.max(0, Math.min(16, Number(fridayHours) || 0)),
+                saturday_hours: Math.max(0, Math.min(16, Number(saturdayHours) || 0)),
+              };
+              const snappedStart = snapToTaskWorkingDay(workSchedule, startDate);
+              const computedDue = addTaskDays(workSchedule, snappedStart, pDays);
               onCreate({
                 id: `task-${Date.now()}`,
                 project_id: projectId,
@@ -5702,9 +5794,11 @@ function NewTaskModal({ productLines, projects, tasks, users, currentUser, defau
                 start_date: snappedStart,
                 due_date: computedDue,
                 planned_days: pDays,
+                ...workSchedule,
                 actual_days: 0,
                 blocked_days: 0,
                 depends_on_id: dependsOnId || null,
+                dependencies_enabled: true,
                 status,
                 blocked_reason: '',
                 approved_by: '',

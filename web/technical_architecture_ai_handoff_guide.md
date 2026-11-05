@@ -8,6 +8,7 @@ Updated 5 November 2026. Repository: https://github.com/hardware-workspace/hardw
 - Production shared workspace was replaced from the user-provided `hardware-tool-projects.json`: 15 project groups, 25 products, and 177 tasks. The earlier 175 production tasks were intentionally cleared. This is database state, separate from Git deployment.
 - All 177 imported tasks lack start and due dates, have zero planned days, status backlog, and no assignee. The published Gantt now shows them as unscheduled rows. Do not invent scheduling dates.
 - The Gantt includes undated tasks as “Unscheduled” rows. It opens on the current Cairo month, shows month bands, and defaults to projects and products with task rows collapsed. Expand and collapse work in stages. The filters include project, product, assignee, and criticality. Right-click opens task details or, for managers, project editing.
+- Managers can also right-click a product row to edit its name and description. The task panel can collapse dependency controls or disable dependencies per task; disabling preserves links but pauses their date adjustments and Gantt wires. Task scheduling uses 8.5 hours per regular day, plus optional per-task extra weekday hours and Friday/Saturday hours; these are stored with each task in the shared JSON workspace. Existing tasks keep their dates until edited.
 - The horizontal scrollbar is under the timeline, leaving the sticky task column outside it. Task notes, title, blocked reason, and weight commit when editing finishes instead of recording each keystroke. The task panel closes only when a pointer press and release both occur on its backdrop. Audit display uses member names for assignee IDs and groups nearby changes to the same field.
 - `hardware-tool-projects.json` and `production-clear-proof.png` are untracked local files. Review them before any bulk staging. The JSON is an import source, not an app bundle input.
 
@@ -31,7 +32,7 @@ Frontend changes and this migration were pushed to `main` through commit `306fbb
 
 ## Scheduling and access rules
 
-- Dates use the Cairo calendar. Friday and Saturday are off. Planned, actual, and blocked days are distinct.
+- Dates use the Cairo calendar. Friday and Saturday remain off by default; task-level hours can schedule work on either day. Planned, actual, and blocked days are distinct.
 - The Gantt has period/zoom controls, task bars, dependencies, and a daily weight view. Undated tasks need explicit dates before they can appear as bars or contribute to scheduled daily weight.
 - Priority P1–P4 is separate from criticality. Task weight is 1–10, with 10 as one person's daily capacity.
 - `src/accountAccess.js` checks verified user/profile and system administrator privileges. The admin UI alone is not the security boundary; server functions must authorize privileged calls.
