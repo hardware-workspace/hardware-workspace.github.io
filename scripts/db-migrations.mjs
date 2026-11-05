@@ -29,6 +29,9 @@ try {
     if (process.env.HARDWARE_DB_DEPLOY !== projectRef) {
       throw new Error(`Set HARDWARE_DB_DEPLOY=${projectRef} for an explicit production migration run.`);
     }
+    if (process.env.HARDWARE_DB_BASELINE_VERIFIED !== projectRef) {
+      throw new Error('Production migration history must be reconciled first. Set HARDWARE_DB_BASELINE_VERIFIED to the project reference only after verifying the baseline.');
+    }
     run(['migration', 'list', target]);
     run(['db', 'push', target, '--dry-run', '--skip-vault']);
     run(['db', 'push', target, '--skip-vault', '--yes']);

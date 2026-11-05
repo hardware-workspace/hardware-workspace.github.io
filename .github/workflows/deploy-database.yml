@@ -26,6 +26,7 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       HARDWARE_DB_DEPLOY: xqhxjolkaqqxqblqvrwg
+      HARDWARE_DB_BASELINE_VERIFIED: ${{ vars.HARDWARE_DB_BASELINE_VERIFIED }}
     steps:
       - name: Check target and token
         run: |

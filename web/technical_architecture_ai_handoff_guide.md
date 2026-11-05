@@ -49,7 +49,7 @@ npm run test:auth
 npm run publish:check
 ```
 
-Set the two `VITE_` variables locally; GitHub Actions uses repository variables for Pages. `AGENTS.md` is the short operating guide and `README.md` has release commands. Requested edits now go to production by default unless the user says local-only. The publisher stages tracked files only; stage new source files explicitly and never stage the untracked import JSON or proof image. Pages verifies the live build commit after deployment. Versioned Supabase migrations have guarded status/plan/deploy commands and a manually dispatched workflow. Automatic migration deployment is gated behind AUTO_DEPLOY_DB=true and a protected Actions token; direct SQL Editor changes may be absent from migration history, so reconcile the baseline before enabling it. Database data imports remain separate.
+Set the two `VITE_` variables locally; GitHub Actions uses repository variables for Pages. `AGENTS.md` is the short operating guide and `README.md` has release commands. Requested edits now go to production by default unless the user says local-only. The publisher stages tracked files only; stage new source files explicitly and never stage the untracked import JSON or proof image. Pages verifies the live build commit after deployment. Versioned Supabase migrations have guarded status/plan/deploy commands and a manually dispatched workflow. Automatic migration deployment is gated behind AUTO_DEPLOY_DB=true, HARDWARE_DB_BASELINE_VERIFIED=<project ref>, and a protected Actions token; direct SQL Editor changes may be absent from migration history, so reconcile the baseline before enabling it. Database data imports remain separate.
 
 ## Next work
 
