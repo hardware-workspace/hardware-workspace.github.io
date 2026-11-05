@@ -7,6 +7,12 @@
 .mobile-bottom-nav { padding-bottom: env(safe-area-inset-bottom, 0px); }
 .workspace-main, .dashboard-view { overscroll-behavior-y: contain; }
 button:focus-visible, a:focus-visible { outline: 2px solid #6366f1; outline-offset: 3px; }
+/* A fieldset's browser default minimum width can push the dependency form outside the task drawer. */
+.task-detail-sheet details,
+.task-detail-sheet details fieldset,
+.task-detail-sheet details .grid,
+.task-detail-sheet details .grid > div { min-width: 0; max-width: 100%; }
+.task-detail-sheet details fieldset { width: 100%; }
 @media (max-width: 767px) {
   .workspace-header { padding-top: max(8px, env(safe-area-inset-top)); }
   .workspace-header > div { gap: 4px; }
