@@ -37,17 +37,24 @@ In Supabase authentication URL settings, allow `https://hardware-workspace.githu
 
 The existing `netlify.toml` and `vercel.json` files remain available for those alternate hosts; GitHub Pages does not apply them or their custom security headers. For an alternate root-domain deployment, use `npm run build` with output `dist` and configure its Supabase build variables separately.
 
-## Publish local changes when ready
+## Release workflow
 
-Changes stay on your computer until you choose to publish. Ask this chat **“publish changes”**, or run:
+Requested edits are published to production by default unless you ask for local-only work. For a frontend change, run focused checks and build, stage intended new files explicitly, then publish:
 
 ```sh
+npm run check:focused
+npm run build
+git add path/to/new-file
 npm run publish:changes -- "Describe the update"
 ```
 
-The publisher checks that you are on `main` in this project and that `origin` points to `https://github.com/hardware-workspace/hardware-workspace.github.io.git`. It fetches GitHub's latest `main`, stops if remote changes are missing locally, builds the app, and runs account-access and CSV security checks. It then stages all eligible local changes, creates a commit if needed, and pushes to GitHub. Your connected hosting provider builds new commits automatically once Git integration is enabled. Check the provider's deployment result to confirm that the update is live.
+The publisher checks the branch and origin, fetches latest `main`, runs the build and focused checks, stages **tracked changes only**, commits, and pushes. New files must already be staged by name. Review `git diff --cached --name-only` before publishing. The Pages workflow deploys each push and verifies that the live HTML identifies the pushed commit and its JavaScript entrypoint loads. A failed verification job means the release is not confirmed live.
 
-This is an on-demand command, not an automatic push after every edit. Review your changes first: the command includes eligible added files, edits, deletions, and any existing staged changes. It refuses tracked or candidate `.env` files (except `.env.example`), `.netlify`, `.vercel`, `node_modules`, and `dist`. Keep other private data out of source files as well. `.env.local` remains local; hosting configuration belongs in your hosting provider's environment variables.
+For a database schema change, add a numbered file under `supabase/migrations`. The pinned CLI offers `npm run db:status`, `npm run db:plan`, and `npm run db:deploy`. These commands target only project `xqhxjolkaqqxqblqvrwg`; deployment also requires `HARDWARE_DB_DEPLOY=xqhxjolkaqqxqblqvrwg`. Supply `SUPABASE_ACCESS_TOKEN` through a protected shell environment or GitHub Actions secret, never source code or chat. The **Deploy Supabase migrations** Actions workflow is manually dispatched with the project reference. It runs status, dry run, then deployment, and reports a failure if the token is missing.
+
+**Before the first CLI database deployment:** compare `npm run db:status` with the live schema. Earlier migrations were executed in the SQL Editor, which may have bypassed Supabase migration history. Reconcile that history only after verifying the equivalent SQL exists; do not blindly replay the old files. Once the baseline is verified, set the repository Actions variable `AUTO_DEPLOY_DB=true` and secret `SUPABASE_ACCESS_TOKEN`. New migration pushes will then deploy automatically. Shared workspace data replacements need separate backups and are never part of the schema workflow.
+
+The publisher refuses tracked or candidate `.env` files (except `.env.example`), `.netlify`, `.vercel`, `node_modules`, and `dist`. Do not stage local import JSON or backup images. `.env.local` stays local; hosting configuration belongs in environment settings.
 
 To validate without staging, committing, or pushing:
 

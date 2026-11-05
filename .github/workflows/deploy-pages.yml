@@ -3,6 +3,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'supabase/migrations/**'
   workflow_dispatch:
 
 permissions:
@@ -28,10 +31,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Check registration and administrator access
-        run: npm run test:auth
-      - name: Check CSV export security
-        run: node src/security.test.js
+      - name: Run focused checks
+        run: npm run check:focused
       - name: Build for the project URL
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
@@ -62,3 +63,16 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
+
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout verification script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .nvmrc
+      - name: Verify live build
+        run: node scripts/verify-deployment.mjs "${{ github.sha }}"

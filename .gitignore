@@ -5,6 +5,7 @@ dist/
 !.env.example
 .netlify/
 .vercel/
+supabase/.temp/
 *.log
 .DS_Store
 .vscode/

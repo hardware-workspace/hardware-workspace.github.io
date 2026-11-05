@@ -1,13 +1,14 @@
 # Hardware Workspace — AI and engineer handoff
 
-Updated 4 November 2026. Repository: https://github.com/hardware-workspace/hardware-workspace.github.io. Production: https://hardware-workspace.github.io/. Local workspace: `D:\_Projects\hardware tool`.
+Updated 5 November 2026. Repository: https://github.com/hardware-workspace/hardware-workspace.github.io. Production: https://hardware-workspace.github.io/. Local workspace: `D:\_Projects\hardware tool`.
 
-## Current state and immediate issue
+## Current production state
 
 - The connected Supabase project is `xqhxjolkaqqxqblqvrwg`. Frontend configuration uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (publishable key). Never use a service-role key in frontend code.
-- Production shared workspace was replaced from the user-provided `hardware-tool-projects.json`. The resulting state was revision 7 with 15 project groups, 25 products, and 177 tasks. The earlier 175 production tasks were intentionally cleared. This is database state, separate from Git deployment.
-- All 177 imported tasks lack start and due dates, have zero planned days, status backlog, and no assignee. The current published Gantt filters out undated tasks, so its empty message is misleading. Do not invent scheduling dates.
+- Production shared workspace was replaced from the user-provided `hardware-tool-projects.json`: 15 project groups, 25 products, and 177 tasks. The earlier 175 production tasks were intentionally cleared. This is database state, separate from Git deployment.
+- All 177 imported tasks lack start and due dates, have zero planned days, status backlog, and no assignee. The published Gantt now shows them as unscheduled rows. Do not invent scheduling dates.
 - The Gantt includes undated tasks as “Unscheduled” rows. It opens on the current Cairo month, shows month bands, and defaults to projects and products with task rows collapsed. Expand and collapse work in stages. The filters include project, product, assignee, and criticality. Right-click opens task details or, for managers, project editing.
+- The horizontal scrollbar is under the timeline, leaving the sticky task column outside it. Task notes, title, blocked reason, and weight commit when editing finishes instead of recording each keystroke. The task panel closes only when a pointer press and release both occur on its backdrop. Audit display uses member names for assignee IDs and groups nearby changes to the same field.
 - `hardware-tool-projects.json` and `production-clear-proof.png` are untracked local files. Review them before any bulk staging. The JSON is an import source, not an app bundle input.
 
 ## Application layout
@@ -23,6 +24,10 @@ Updated 4 November 2026. Repository: https://github.com/hardware-workspace/hardw
 ## Production save repair
 
 On 4 November 2026, task saves returned HTTP 400 / PostgreSQL 21000 because the project enforces safe updates and `save_shared_workspace` updated the singleton table without a WHERE clause. `supabase/migrations/202611040002_shared_workspace_safe_update.sql` adds `where singleton = true` to the function. The equivalent change was applied in the Supabase SQL Editor. A temporary task was created, saved, deleted, and the task count returned to 177. The test revision was restored to 7 to preserve compatibility with a browser tab holding earlier unsaved edits. The app now displays the underlying save error and waits 900 ms between edits.
+
+The user's original browser tab may still contain edits that failed before the repair. **Do not refresh or discard that tab before clicking “Retry save.”** Its successful retry has not been independently verified. If it reports a revision conflict, preserve the visible edits and resolve the conflict before reloading.
+
+Frontend changes and this migration were pushed to `main` through commit `306fbbd`; the final GitHub Pages deployment completed successfully. Local build, authentication checks, and CSV security checks passed. The temporary production save test was verified after reload.
 
 ## Scheduling and access rules
 
@@ -44,10 +49,10 @@ npm run test:auth
 npm run publish:check
 ```
 
-Set the two `VITE_` variables locally; GitHub Actions uses repository variables for Pages. `README.md` describes the publish command. The user submits code on request. Review `git status`, stage only intended files, run checks, push to `main`, and verify Pages. Database imports and SQL deployments are separate from frontend publishing.
+Set the two `VITE_` variables locally; GitHub Actions uses repository variables for Pages. `AGENTS.md` is the short operating guide and `README.md` has release commands. Requested edits now go to production by default unless the user says local-only. The publisher stages tracked files only; stage new source files explicitly and never stage the untracked import JSON or proof image. Pages verifies the live build commit after deployment. Versioned Supabase migrations have guarded status/plan/deploy commands and a manually dispatched workflow. Automatic migration deployment is gated behind AUTO_DEPLOY_DB=true and a protected Actions token; direct SQL Editor changes may be absent from migration history, so reconcile the baseline before enabling it. Database data imports remain separate.
 
 ## Next work
 
-1. Verify the published site lists all 177 undated tasks as unscheduled rows and that the staged expansion and product filter work.
+1. Confirm the earlier unsaved browser edits have been retried and persisted. Avoid overwriting them from another tab in the meantime.
 2. Let the user supply dates, durations, and assignees intentionally. Do not fabricate a schedule from the import.
 3. Verify live admin CRUD and email deployment independently. Older setup documents contain historical “not connected” statements.

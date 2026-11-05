@@ -79,10 +79,8 @@ try {
   }
   console.log('Building the app…');
   run(process.execPath, [npmCli, 'run', 'build']);
-  console.log('Checking registration and administrator access…');
-  run(process.execPath, [path.join(root, 'src', 'accountAccess.test.js')]);
-  console.log('Checking CSV export security…');
-  run(process.execPath, [path.join(root, 'src', 'security.test.js')]);
+  console.log('Running focused checks…');
+  run(process.execPath, [path.join(root, 'scripts', 'check-focused.mjs')]);
   verifyTarget();
   verifyUploadFiles();
 
@@ -91,7 +89,8 @@ try {
     process.exit(0);
   }
 
-  run('git', ['add', '-A']);
+  // New files must be explicitly staged by the caller. Never sweep up import data or backups.
+  run('git', ['add', '-u']);
   verifyUploadFiles();
   const staged = git(['diff', '--cached', '--quiet'], { allowFailure: true });
   if (staged.status === 1) {
@@ -103,7 +102,7 @@ try {
   }
   verifyTarget();
   run('git', ['push', 'origin', 'main'], { timeout: 45_000 });
-  console.log('GitHub main is up to date. Your connected hosting provider builds new commits automatically; confirm the deploy succeeds before sharing the update.');
+  console.log('GitHub main is up to date. Pages will build and verify the live commit in GitHub Actions.');
 } catch (error) {
   console.error(`\n${error.message}`);
   console.error('Your local work is preserved. Fix the reported issue, then retry.');
