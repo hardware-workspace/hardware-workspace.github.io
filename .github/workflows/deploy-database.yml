@@ -7,6 +7,12 @@ on:
       - 'supabase/migrations/**'
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'Plan only, or apply migrations after baseline verification'
+        type: choice
+        options: [plan, deploy]
+        default: plan
+        required: true
       project_ref:
         description: 'Type xqhxjolkaqqxqblqvrwg to target production'
         required: true
@@ -43,4 +49,5 @@ jobs:
       - name: Show migration status and plan
         run: npm run db:status && npm run db:plan
       - name: Apply pending migrations
+        if: github.event_name == 'push' || inputs.mode == 'deploy'
         run: npm run db:deploy
