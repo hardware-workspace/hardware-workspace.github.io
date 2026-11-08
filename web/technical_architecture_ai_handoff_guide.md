@@ -1,12 +1,12 @@
 # Hardware Workspace — AI and engineer handoff
 
-Updated 5 November 2026. Repository: https://github.com/hardware-workspace/hardware-workspace.github.io. Production: https://hardware-workspace.github.io/. Local workspace: `D:\_Projects\hardware tool`.
+Updated 8 November 2026. Repository: https://github.com/hardware-workspace/hardware-workspace.github.io. Production: https://hardware-workspace.github.io/. Local workspace: `D:\_Projects\hardware tool`.
 
 ## Current production state
 
 - The connected Supabase project is `xqhxjolkaqqxqblqvrwg`. Frontend configuration uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (publishable key). Never use a service-role key in frontend code.
 - Production shared workspace was replaced from the user-provided `hardware-tool-projects.json`: 15 project groups, 25 products, and 177 tasks. The earlier 175 production tasks were intentionally cleared. This is database state, separate from Git deployment.
-- All 177 imported tasks lack start and due dates, have zero planned days, status backlog, and no assignee. The published Gantt now shows them as unscheduled rows. Do not invent scheduling dates.
+- On 5 November, 176 undated tasks were scheduled in production and one existing schedule was preserved.
 - The Gantt includes undated tasks as “Unscheduled” rows. It opens on the current Cairo month, shows month bands, and defaults to projects and products with task rows collapsed. Expand and collapse work in stages. The filters include project, product, assignee, and criticality. Right-click opens task details or, for managers, project editing.
 - Managers can also right-click a product row to edit its name and description. The task panel can collapse dependency controls or disable dependencies per task; disabling preserves links but pauses their date adjustments and Gantt wires. Task scheduling uses 8.5 hours per regular day, plus optional per-task extra weekday hours and Friday/Saturday hours; these are stored with each task in the shared JSON workspace. Existing tasks keep their dates until edited.
 - The horizontal scrollbar is under the timeline, leaving the sticky task column outside it. Task notes, title, blocked reason, and weight commit when editing finishes instead of recording each keystroke. The task panel closes only when a pointer press and release both occur on its backdrop. Audit display uses member names for assignee IDs and groups nearby changes to the same field.
@@ -55,5 +55,5 @@ Set the two `VITE_` variables locally; GitHub Actions uses repository variables 
 ## Next work
 
 1. Confirm the earlier unsaved browser edits have been retried and persisted. Avoid overwriting them from another tab in the meantime.
-2. Let the user supply dates, durations, and assignees intentionally. Do not fabricate a schedule from the import.
+2. Viewer roles, expanded member edits, and server enforcement of prerequisite completion require migration 202611080001. Members can move assigned tasks without changing planned duration. New schedule calculations include both endpoints and follow the Cairo workweek.
 3. Verify live admin CRUD and email deployment independently. Older setup documents contain historical “not connected” statements.

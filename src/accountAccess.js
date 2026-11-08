@@ -1,7 +1,7 @@
-const workspaceRoles = new Set(['member', 'manager']);
+const workspaceRoles = new Set(['member', 'manager', 'viewer']);
 const missingProfileTable = new Set(['PGRST205', '42P01']);
 
-// Registration is intentionally open to both workspace roles. Neither role
+// Registration is intentionally open to the workspace roles. Neither role
 // grants system-administrator access, which is checked separately on the server.
 export function signupRole(value) {
   return workspaceRoles.has(value) ? value : 'member';

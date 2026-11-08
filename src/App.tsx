@@ -259,6 +259,12 @@ const CRITICALITY_META = {
 };
 
 // Helper: Check if a YYYY-MM-DD falls on Egyptian weekend (Friday = 5, Saturday = 6)
+function itemNumber(prefix, id) {
+  let n = 0n;
+  for (const c of String(id)) n = (n * 131n + BigInt(c.codePointAt(0))) % 10000000000000n;
+  return prefix + '-' + n.toString().padStart(13, '0');
+}
+
 function isWeekendCairo(dateStr) {
   if (!dateStr) return false;
   const d = new Date(dateStr + 'T00:00:00Z');
@@ -358,7 +364,7 @@ function getEffectiveEndDate(task) {
   if (!task || !task.start_date) return null;
   const baseDue = task.due_date || addTaskDays(task, task.start_date, task.planned_days || 1);
   const blockedExtra = Number(task.blocked_days) > 0 ? Number(task.blocked_days) : 0;
-  return blockedExtra > 0 ? addTaskDays(task, baseDue, blockedExtra) : baseDue;
+  return blockedExtra > 0 ? addTaskDays(task, addCalendarDays(baseDue, 1), blockedExtra) : baseDue;
 }
 
 function formatShortDate(dateStr) {
@@ -963,7 +969,7 @@ export default function App({ account, onSignOut }) {
     if (!supabase) return;
     let active = true;
     supabase.rpc('task_assignee_directory').then(({data,error}) => {
-      if(active && !error && data) setUsers(previous => [...data, ...previous.filter(user => !data.some(real => real.id === user.id))]);
+      if(active && !error && data) setUsers(previous => [...data.map(user => ({ ...user, initials: user.name.trim().split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase(), color: 'bg-indigo-600' })), ...previous.filter(user => !data.some(real => real.id === user.id))]);
     });
     return () => { active = false; };
   }, []);
@@ -997,7 +1003,7 @@ export default function App({ account, onSignOut }) {
   const [selectedCriticalities, setSelectedCriticalities] = useState([]);
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [overdueOnly, setOverdueOnly] = useState(false);
-  const [myTasksOnly, setMyTasksOnly] = useState(false);
+  const [myTasksOnly, setMyTasksOnly] = useState(account.role === 'member');
 
   // Gantt Controls
   const [ganttZoom, setGanttZoom] = useState('week');
@@ -1013,6 +1019,7 @@ export default function App({ account, onSignOut }) {
   // Modals & Side Panel
   const [editingProject, setEditingProject] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [checkedTasks, setCheckedTasks] = useState([]);
   const [selectedTaskId, setSelectedTaskId] = useState(() => { const id = new URLSearchParams(location.search).get('task'); return id; });
   const [blockedModalState, setBlockedModalState] = useState(null);
   const [inProgressModalState, setInProgressModalState] = useState(null);
@@ -1074,7 +1081,7 @@ export default function App({ account, onSignOut }) {
   const canEditTask = (task) => {
     if (!task) return false;
     if (currentUser.role === 'manager') return true;
-    return task.assignee_id === currentUser.id;
+    return currentUser.role === 'member' && task.assignee_id === currentUser.id;
   };
 
   const clearAllFilters = () => {
@@ -1117,15 +1124,41 @@ export default function App({ account, onSignOut }) {
     return next;
   });
   const ganttCollapseLabel = projects.some((project) => !collapsedGroups[`proj-${project.id}`])
-    ? 'Hide Tasks'
+    ? 'Collapse Tasks'
     : productLines.some((pl) => !collapsedGroups[`pl-${pl.id}`])
-    ? 'Hide Products'
+    ? 'Collapse Products to Projects'
     : 'All Collapsed';
+
+  const markSelectedDone = (ids) => {
+    const pending = new Set(ids);
+    const next = tasks.map(task => ({ ...task }));
+    const lookup = new Map(next.map(task => [task.id, task]));
+    const timestamp = new Date().toISOString();
+    let count = 0;
+    for (let progress = true; progress;) {
+      progress = false;
+      for (const task of next) {
+        if (!pending.has(task.id) || task.status === 'done' || !canEditTask(task)) continue;
+        if (task.depends_on_id && lookup.get(task.depends_on_id)?.status !== 'done') continue;
+        Object.assign(task, { status: 'done', actual_days: Number(task.actual_days) || Number(task.planned_days) || 1,
+          updated_at: timestamp, completed_at: timestamp });
+        pending.delete(task.id);
+        count++;
+        progress = true;
+      }
+    }
+    if (count) {
+      setUndoHistory(previous => [...previous.slice(-29), { tasksSnapshot: tasks, label: 'Mark selected tasks done' }]);
+      setTasks(next);
+    }
+    setCheckedTasks([...pending]);
+    pushToast(count ? 'success' : 'info', count + ' tasks marked done', pending.size + ' skipped.');
+  };
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
       const proj = projectMap[t.project_id];
-      if (!proj || proj.archived) return false;
+      if (!proj || proj.archived || productLineMap[proj.product_line_id]?.archived) return false;
 
       if (myTasksOnly && t.assignee_id !== currentUser.id) return false;
       if (overdueOnly && !isTaskOverdue(t)) return false;
@@ -1157,10 +1190,12 @@ export default function App({ account, onSignOut }) {
       }
 
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+        const q = searchQuery.trim().toLowerCase();
         const plName = productLineMap[proj.product_line_id]?.name || '';
         const assigneeName = t.assignee_id ? userMap[t.assignee_id]?.name || '' : '';
         const match =
+          [itemNumber('T', t.id), itemNumber('PRD', proj.id), itemNumber('PRJ', proj.product_line_id)]
+            .some(number => number.toLowerCase().includes(q.replace(/^#/, ''))) ||
           (t.title || '').toLowerCase().includes(q) ||
           (t.details || '').toLowerCase().includes(q) ||
           (proj.name || '').toLowerCase().includes(q) ||
@@ -1235,15 +1270,17 @@ export default function App({ account, onSignOut }) {
       }
 
       if (e.key === 'Escape') {
-        setSelectedTaskId(null);
-        setBlockedModalState(null);
-        setInProgressModalState(null);
-        setDoneTransitionModalState(null);
-        setCreateHierarchyModalOpen(false);
-        setNewTaskModalOpen(false);
-        setSplitTaskModalTarget(null);
-        setDryRunModalOpen(false);
-        setShortcutModalOpen(false);
+        if (doneTransitionModalState) setDoneTransitionModalState(null);
+        else if (blockedModalState) setBlockedModalState(null);
+        else if (inProgressModalState) setInProgressModalState(null);
+        else if (splitTaskModalTarget) setSplitTaskModalTarget(null);
+        else if (editingProduct) setEditingProduct(null);
+        else if (editingProject) setEditingProject(null);
+        else if (createHierarchyModalOpen) setCreateHierarchyModalOpen(false);
+        else if (newTaskModalOpen) setNewTaskModalOpen(false);
+        else if (dryRunModalOpen) setDryRunModalOpen(false);
+        else if (shortcutModalOpen) setShortcutModalOpen(false);
+        else setSelectedTaskId(null);
         return;
       }
 
@@ -1252,11 +1289,11 @@ export default function App({ account, onSignOut }) {
       if (e.key === '/') {
         e.preventDefault();
         searchInputRef.current?.focus();
-      } else if (e.key.toLowerCase() === 'n') {
+      } else if (e.key.toLowerCase() === 'n' && currentUser.role === 'manager') {
         e.preventDefault();
         setNewTaskDefaultStatus('backlog');
         setNewTaskModalOpen(true);
-      } else if (e.key.toLowerCase() === 'p') {
+      } else if (e.key.toLowerCase() === 'p' && currentUser.role === 'manager') {
         e.preventDefault();
         setCreateHierarchyModalOpen(true);
       } else if (e.key === '?') {
@@ -1287,7 +1324,7 @@ export default function App({ account, onSignOut }) {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [tasks, undoHistory, currentUser, doneTransitionModalState, blockedModalState, inProgressModalState, splitTaskModalTarget, editingProduct, editingProject, createHierarchyModalOpen, newTaskModalOpen, dryRunModalOpen, shortcutModalOpen]);
 
   // Initial Rule: Auto-push any dependent task whose prerequisite is not Done yet
   const cascadeDependentTasks = (taskList, changedTaskId) => {
@@ -1309,8 +1346,8 @@ export default function App({ account, onSignOut }) {
 
       updatedList = updatedList.map((child) => {
         if (child.depends_on_id === parentId && child.dependencies_enabled !== false && parentTask.dependencies_enabled !== false) {
-          if (parentTask.status !== 'done' || !child.start_date || child.start_date < parentEnd) {
-            const nextStart = snapToTaskWorkingDay(child, parentEnd);
+          if (parentTask.status !== 'done' || !child.start_date || child.start_date <= parentEnd) {
+            const nextStart = snapToTaskWorkingDay(child, addCalendarDays(parentEnd, 1));
             const nextDue = addTaskDays(child, nextStart, child.planned_days || 1);
             if (child.start_date !== nextStart || child.due_date !== nextDue) {
               cascadedCount++;
@@ -1345,12 +1382,13 @@ export default function App({ account, onSignOut }) {
       return false;
     }
 
-    if (shared && currentUser.role !== 'manager' && Object.keys(patch).some(field => !['status','actual_days','blocked_days','blocked_reason'].includes(field))) {
-      pushToast(
-        'error',
-        'Manager Permission Required',
-        'Members can update status, actual time and blocked time on assigned tasks.'
-      );
+    if (currentUser.role !== 'manager' && ('planned_days' in patch || 'due_date' in patch || 'assignee_id' in patch || 'project_id' in patch)) {
+      pushToast('error', 'Manager permission required', 'Members can move assigned tasks while keeping their planned duration.');
+      return false;
+    }
+
+    if (patch.status === 'done' && existing.status !== 'done' && existing.depends_on_id && taskMap[existing.depends_on_id]?.status !== 'done') {
+      pushToast('error', 'Finish the prerequisite first', taskMap[existing.depends_on_id]?.title || 'The prerequisite is missing.');
       return false;
     }
 
@@ -1361,6 +1399,12 @@ export default function App({ account, onSignOut }) {
         reason: existing.blocked_reason || '',
         blockedDays: existing.blocked_days || 2,
       });
+      return false;
+    }
+
+    const assignedProduct = projectMap[existing.project_id];
+    if ('assignee_id' in patch && assignedProduct?.assignee_ids?.length === 1 && patch.assignee_id !== assignedProduct.assignee_ids[0]) {
+      pushToast('error', 'Product has one assignee', 'Change the product assignees first.');
       return false;
     }
 
@@ -1375,22 +1419,22 @@ export default function App({ account, onSignOut }) {
 
     // Planned Time (`planned_days`) is the main duration driver on the Gantt chart
     if (patch.planned_days !== undefined) {
-      const pDays = Math.max(0.5, Number(patch.planned_days) || 1);
+      const pDays = Math.max(0, Number(patch.planned_days) || 0);
       updated.planned_days = pDays;
       if (updated.start_date) {
-        updated.due_date = addTaskDays(updated, updated.start_date, pDays);
+        updated.due_date = pDays ? addTaskDays(updated, updated.start_date, pDays) : null;
       }
     } else if (patch.start_date !== undefined && patch.due_date !== undefined) {
       updated.planned_days = taskDaysBetween(updated, updated.start_date, updated.due_date);
     } else if (patch.start_date !== undefined && !patch.due_date && updated.planned_days != null) {
-      updated.due_date = addTaskDays(updated, updated.start_date, updated.planned_days);
+      updated.due_date = Number(updated.planned_days) > 0 ? addTaskDays(updated, updated.start_date, updated.planned_days) : null;
     } else if (patch.due_date !== undefined && updated.start_date) {
       updated.planned_days = taskDaysBetween(updated, updated.start_date, updated.due_date);
     }
 
     if (['extra_hours_per_day', 'friday_hours', 'saturday_hours'].some((field) => patch[field] !== undefined)) {
       for (const field of ['extra_hours_per_day', 'friday_hours', 'saturday_hours']) {
-        updated[field] = Math.max(0, Math.min(field === 'extra_hours_per_day' ? 15.5 : 16, Number(updated[field]) || 0));
+        updated[field] = Math.max(0, Math.min(field === 'planned_days' ? 3660 : field === 'extra_hours_per_day' ? 15.5 : 16, Number(updated[field]) || 0));
       }
       if (updated.start_date) {
         updated.start_date = snapToTaskWorkingDay(updated, updated.start_date);
@@ -1403,8 +1447,8 @@ export default function App({ account, onSignOut }) {
       const prereq = tasks.find((t) => t.id === updated.depends_on_id);
       if (prereq && prereq.dependencies_enabled !== false && prereq.status !== 'done' && prereq.start_date) {
         const prereqEnd = getEffectiveEndDate(prereq);
-        if (prereqEnd && (!updated.start_date || updated.start_date < prereqEnd)) {
-          updated.start_date = snapToTaskWorkingDay(updated, prereqEnd);
+        if (prereqEnd && (!updated.start_date || updated.start_date <= prereqEnd)) {
+          updated.start_date = snapToTaskWorkingDay(updated, addCalendarDays(prereqEnd, 1));
           updated.due_date = addTaskDays(updated, updated.start_date, updated.planned_days || 1);
         }
       }
@@ -1551,13 +1595,18 @@ export default function App({ account, onSignOut }) {
       return;
     }
 
+    if (targetStatus === 'done' && task.depends_on_id && taskMap[task.depends_on_id]?.status !== 'done') {
+      pushToast('error', 'Finish the prerequisite first', taskMap[task.depends_on_id]?.title || 'The prerequisite is missing.');
+      return false;
+    }
+
     // Transition from anything -> Done prompts for Actual Days + Next Step (including Link Another Task)
     if (targetStatus === 'done' && task.status !== 'done') {
       setDoneTransitionModalState({
         taskId,
         actualDays: task.actual_days && Number(task.actual_days) > 0 ? task.actual_days : task.planned_days || 2,
-        note: 'Completed hardware validation and uploaded measurements.',
-        nextStepType: 'send_review_copy', // 'send_review_copy' | 'create_related_task' | 'link_existing_task' | 'note_only'
+        note: '',
+        nextStepType: 'note_only', // 'send_review_copy' | 'create_related_task' | 'link_existing_task' | 'note_only'
         reviewerId: 'u-mohamed',
         followUpTitle: `${task.title} — Peer Review & QA Sign-off`,
         linkedTaskId: '',
@@ -1591,7 +1640,7 @@ export default function App({ account, onSignOut }) {
 
   // Split Task into 2 Tasks
   const handleSplitTask = ({ originalTask, part1Title, part1PlannedDays, part2Title, part2PlannedDays, part2AssigneeId }) => {
-    if (!canEditTask(originalTask)) {
+    if (currentUser.role !== 'manager' || !canEditTask(originalTask)) {
       pushToast('error', 'Permission Denied', 'You do not have permission to split this task.');
       return;
     }
@@ -1600,9 +1649,9 @@ export default function App({ account, onSignOut }) {
     const p2Days = Math.max(0.5, Number(part2PlannedDays) || 1);
 
     const p1Start = originalTask.start_date ? snapToWorkingDay(originalTask.start_date, 1) : TODAY_CAIRO;
-    const p1Due = addDays(p1Start, p1Days);
-    const p2Start = snapToWorkingDay(p1Due, 1);
-    const p2Due = addDays(p2Start, p2Days);
+    const p1Due = addTaskDays(originalTask, p1Start, p1Days);
+    const p2Start = snapToTaskWorkingDay(originalTask, addCalendarDays(p1Due, 1));
+    const p2Due = addTaskDays(originalTask, p2Start, p2Days);
 
     const updatedPart1 = {
       ...originalTask,
@@ -1663,6 +1712,7 @@ export default function App({ account, onSignOut }) {
 
   // Add Comment
   const handleAddComment = (taskId, bodyText) => {
+    if (currentUser.role === 'viewer') return;
     if (!bodyText.trim()) return;
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
@@ -1866,7 +1916,7 @@ export default function App({ account, onSignOut }) {
                 </button>
               )}
 
-              <button
+              {currentUser.role === 'manager' && <><button
                 onClick={() => setCreateHierarchyModalOpen(true)}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium shadow-xs transition-colors shrink-0"
                 title="Create Project or Product"
@@ -1885,7 +1935,7 @@ export default function App({ account, onSignOut }) {
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>New Task</span>
-              </button>
+              </button></>}
 
               <div className="hidden md:flex items-center gap-2 rounded-xl border border-stone-200 dark:border-slate-700 px-3 py-1.5 text-xs">
                 <Shield className="h-4 w-4 text-indigo-600" />
@@ -2029,7 +2079,7 @@ export default function App({ account, onSignOut }) {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search tasks... (/)"
+                    placeholder="Search tasks, products, projects or IDs (/)"
                     className="w-full pl-8 pr-3 py-1 rounded-lg bg-stone-100 dark:bg-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
@@ -2187,15 +2237,21 @@ export default function App({ account, onSignOut }) {
               setZoomScale={setZoomScale}
               collapsedGroups={collapsedGroups}
               setCollapsedGroups={setCollapsedGroups}
+              checkedTasks={checkedTasks}
+              setCheckedTasks={setCheckedTasks}
+              onMarkDone={currentUser.role === 'viewer' ? null : markSelectedDone}
+              canEditTask={canEditTask}
+              canResize={currentUser.role === 'manager'}
+              showEmptyGroups={!searchQuery.trim() && !myTasksOnly && !overdueOnly && !selectedAssignees.length && !selectedProductLines.length && !selectedProjects.length && !selectedPriorities.length && !selectedCriticalities.length && !selectedStatuses.length}
               onExpandAll={expandAllGanttGroups}
               expandLabel={ganttExpandLabel}
               onCollapseAll={collapseAllGanttGroups}
               collapseLabel={ganttCollapseLabel}
               onSelectTask={(taskId) => setSelectedTaskId(taskId)}
               onEditProject={currentUser.role === 'manager' ? (pl) => setEditingProject({ id: pl.id, name: pl.name, description: pl.description || '' }) : null}
-              onEditProduct={currentUser.role === 'manager' ? (product) => setEditingProduct({ id: product.id, name: product.name, description: product.description || '' }) : null}
+              onEditProduct={currentUser.role === 'manager' ? (product) => setEditingProduct({ id: product.id, name: product.name, description: product.description || '', assignee_ids: product.assignee_ids || [] }) : null}
               onUpdateTask={updateTask}
-              onRequestSplitTask={(task) => setSplitTaskModalTarget(task)}
+              onRequestSplitTask={(task) => { if (currentUser.role === 'manager') setSplitTaskModalTarget(task); }}
               pushToast={pushToast}
             />
           )}
@@ -2212,21 +2268,22 @@ export default function App({ account, onSignOut }) {
                 onSelectTask={(taskId) => setSelectedTaskId(taskId)}
                 onRequestStatusChange={requestStatusChange}
                 onUpdateTask={updateTask}
-                onRequestSplitTask={(task) => setSplitTaskModalTarget(task)}
+                onRequestSplitTask={(task) => { if (currentUser.role === 'manager') setSplitTaskModalTarget(task); }}
                 onQuickAddTask={(status, title) => {
-                  const firstProj = projects.find((p) => !p.archived);
+                  if (currentUser.role !== 'manager') return;
+                  const firstProj = projects.find((p) => !p.archived && !productLineMap[p.product_line_id]?.archived);
                   if (!firstProj) { pushToast('error', 'Create a product first', 'A task needs a product.'); return; }
                   const newTask = {
                     id: `task-${Date.now()}`,
                     project_id: firstProj.id,
                     title,
                     details: '',
-                    assignee_id: currentUser.id,
+                    assignee_id: firstProj.assignee_ids?.length === 1 ? firstProj.assignee_ids[0] : currentUser.id,
                     priority: 2,
                     criticality: 'medium',
-                    weight: 5,
-                    start_date: TODAY_CAIRO,
-                    due_date: addDays(TODAY_CAIRO, 3),
+                    weight: 10,
+                    start_date: snapToTaskWorkingDay({}, TODAY_CAIRO),
+                    due_date: addTaskDays({}, TODAY_CAIRO, 3),
                     planned_days: 3,
                     actual_days: 0,
                     blocked_days: 0,
@@ -2265,7 +2322,7 @@ export default function App({ account, onSignOut }) {
 
           {activeTab === 'settings' && (
             <div className="settings-scroll flex-1 overflow-y-auto pr-1">
-              <AccountSettings account={currentUser} onUpdated={patch=>setUsers(previous=>previous.map(user=>user.id===currentUser.id?{...user,...patch}:user))} onSignOut={onSignOut}/><EmailPreferences userId={currentUser.id}/><SettingsView
+              <AccountSettings account={currentUser} onUpdated={patch=>setUsers(previous=>previous.map(user=>user.id===currentUser.id?{...user,...patch}:user))} onSignOut={onSignOut}/><EmailPreferences userId={currentUser.id}/>{currentUser.role === 'manager' && <SettingsView
                 currentUser={currentUser}
                 productLines={productLines}
                 setProductLines={setProductLines}
@@ -2280,7 +2337,7 @@ export default function App({ account, onSignOut }) {
                 onExportCSV={handleExportCSV}
                 emailOutbox={emailOutbox}
                 pushToast={pushToast}
-              />
+              />}
             </div>
           )}
           </>}
@@ -2301,6 +2358,11 @@ export default function App({ account, onSignOut }) {
             <h2 className="text-lg font-bold">Edit project</h2>
             <label className="block text-sm font-medium">Name<input required value={editingProject.name} onChange={(event) => setEditingProject({ ...editingProject, name: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" /></label>
             <label className="block text-sm font-medium">Description<textarea value={editingProject.description} onChange={(event) => setEditingProject({ ...editingProject, description: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" rows={3} /></label>
+            <button type="button" className="text-rose-600 text-sm" onClick={() => {
+              if (!window.confirm('Remove this project from active views? Its products and tasks will be retained.')) return;
+              setProductLines(previous => previous.map(project => project.id === editingProject.id ? { ...project, archived: true } : project));
+              setEditingProject(null);
+            }}>Remove project</button>
             <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingProject(null)} className="rounded-lg border px-3 py-2">Cancel</button><button type="submit" className="rounded-lg bg-indigo-600 px-3 py-2 text-white">Save project</button></div>
           </form>
         </div>}
@@ -2309,12 +2371,25 @@ export default function App({ account, onSignOut }) {
             event.preventDefault();
             const name = editingProduct.name.trim();
             if (!name) return;
-            setProjects((previous) => previous.map((product) => product.id === editingProduct.id ? { ...product, name, description: editingProduct.description.trim() } : product));
+            setProjects((previous) => previous.map((product) => product.id === editingProduct.id ? { ...product, name, description: editingProduct.description.trim(), assignee_ids: editingProduct.assignee_ids } : product));
+            if (editingProduct.assignee_ids.length === 1) {
+              const assignee = editingProduct.assignee_ids[0];
+              setTasks(previous => previous.map(task => task.project_id === editingProduct.id && task.assignee_id !== assignee
+                ? { ...task, assignee_id: assignee, updated_at: new Date().toISOString() } : task));
+            }
             setEditingProduct(null);
           }} className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-5 space-y-4 shadow-2xl">
             <h2 className="text-lg font-bold">Edit product</h2>
             <label className="block text-sm font-medium">Name<input required value={editingProduct.name} onChange={(event) => setEditingProduct({ ...editingProduct, name: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" /></label>
             <label className="block text-sm font-medium">Description<textarea value={editingProduct.description} onChange={(event) => setEditingProduct({ ...editingProduct, description: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" rows={3} /></label>
+            <fieldset className="max-h-32 overflow-auto space-y-1"><legend className="text-sm font-medium">Product assignees</legend>
+              {users.filter(user => user.is_active && user.role !== 'viewer').map(user => <label key={user.id} className="block text-sm"><input type="checkbox" className="mr-2" checked={editingProduct.assignee_ids.includes(user.id)} onChange={event => { const checked = event.target.checked; setEditingProduct(previous => ({ ...previous, assignee_ids: checked ? [...previous.assignee_ids, user.id] : previous.assignee_ids.filter(id => id !== user.id) })); }} />{user.name}</label>)}
+            </fieldset>
+            <button type="button" className="text-rose-600 text-sm" onClick={() => {
+              if (!window.confirm('Remove this product from active views? Its tasks are retained and the product can be restored in Settings.')) return;
+              setProjects(previous => previous.map(product => product.id === editingProduct.id ? { ...product, archived: true } : product));
+              setEditingProduct(null);
+            }}>Remove product</button>
             <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingProduct(null)} className="rounded-lg border px-3 py-2">Cancel</button><button type="submit" className="rounded-lg bg-indigo-600 px-3 py-2 text-white">Save product</button></div>
           </form>
         </div>}
@@ -2338,9 +2413,9 @@ export default function App({ account, onSignOut }) {
             onClose={() => setSelectedTaskId(null)}
             onUpdateTask={updateTask}
             onRequestStatusChange={requestStatusChange}
-            onRequestSplitTask={(t) => setSplitTaskModalTarget(t)}
+            onRequestSplitTask={(t) => { if (currentUser.role === 'manager') setSplitTaskModalTarget(t); }}
             onAddComment={handleAddComment}
-            onSendReminder={handleSendManualReminder}
+            onSendReminder={currentUser.role === 'viewer' ? undefined : handleSendManualReminder}
             onSelectOtherTask={(otherId) => setSelectedTaskId(otherId)}
             onDeleteTask={(taskId) => {
               if (currentUser.role !== 'manager') {
@@ -2368,27 +2443,12 @@ export default function App({ account, onSignOut }) {
             >
               <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
                 <Ban className="w-5 h-5" />
-                <h3 className="font-bold text-lg">Blocked Reason & Blocked Duration</h3>
+                <h3 className="font-bold text-lg">Blocked Reason</h3>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                Moving a task to <strong>Blocked</strong> requires a reason and the number of blocked days so the blocked segment is represented on the Gantt bar.
+                Moving a task to <strong>Blocked</strong> requires a reason.
               </p>
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">
-                    Blocked Duration (Working Days)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0.5"
-                    value={blockedModalState.blockedDays}
-                    onChange={(e) =>
-                      setBlockedModalState((prev) => ({ ...prev, blockedDays: e.target.value }))
-                    }
-                    className="w-full rounded-xl border border-stone-300 dark:border-slate-700 bg-stone-50 dark:bg-slate-800 p-2.5 text-sm font-bold text-amber-700 dark:text-amber-300"
-                  />
-                </div>
                 <div className="col-span-2">
                   <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">
                     Blocked Reason (Required)
@@ -2416,21 +2476,19 @@ export default function App({ account, onSignOut }) {
                       pushToast('error', 'Blocked Reason Required', 'Cannot move to Blocked with an empty reason.');
                       return;
                     }
-                    const bDays = Math.max(0.5, Number(blockedModalState.blockedDays) || 1);
                     updateTask(
                       blockedModalState.taskId,
                       {
                         status: 'blocked',
                         blocked_reason: blockedModalState.reason.trim(),
-                        blocked_days: bDays,
                       },
-                      { allowUndo: true, actionLabel: `Task moved to Blocked (${bDays}d)` }
+                      { allowUndo: true, actionLabel: `Task moved to Blocked` }
                     );
                     setBlockedModalState(null);
                   }}
                   className="px-4 py-2 rounded-xl text-sm font-semibold bg-amber-600 hover:bg-amber-700 text-white"
                 >
-                  Confirm Blocked ({blockedModalState.blockedDays || 1}d)
+                  Confirm Blocked
                 </button>
               </div>
             </div>
@@ -2543,15 +2601,15 @@ export default function App({ account, onSignOut }) {
                     }
                     className="w-full rounded-xl border border-stone-300 dark:border-slate-700 bg-stone-50 dark:bg-slate-800 px-3 py-2 text-sm font-semibold"
                   >
-                    <option value="send_review_copy">1. Send a copy to another person to review</option>
-                    <option value="create_related_task">2. Create a related follow-up task</option>
-                    <option value="link_existing_task">3. Link another existing task as dependent</option>
+                    <option disabled={currentUser.role !== 'manager'} value="send_review_copy">1. Send a copy to another person to review</option>
+                    <option disabled={currentUser.role !== 'manager'} value="create_related_task">2. Create a related follow-up task</option>
+                    <option disabled={currentUser.role !== 'manager'} value="link_existing_task">3. Link another existing task as dependent</option>
                     <option value="note_only">4. Log completion note only</option>
                   </select>
                 </div>
               </div>
 
-              {doneTransitionModalState.nextStepType !== 'note_only' &&
+              {currentUser.role === 'manager' && doneTransitionModalState.nextStepType !== 'note_only' &&
                 doneTransitionModalState.nextStepType !== 'link_existing_task' && (
                   <div className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 space-y-3">
                     <div>
@@ -2649,15 +2707,14 @@ export default function App({ account, onSignOut }) {
                     }
 
                     const actDays = Math.max(0.5, Number(doneTransitionModalState.actualDays) || orig.planned_days || 1);
-                    updateTask(
+                    if (!updateTask(
                       orig.id,
                       {
                         status: 'done',
                         actual_days: actDays,
-                        time_spent_note: `${actDays} days`,
                       },
                       { allowUndo: true, actionLabel: 'Task marked Done' }
-                    );
+                    )) return;
 
                     handleAddComment(
                       orig.id,
@@ -2668,7 +2725,7 @@ export default function App({ account, onSignOut }) {
                       doneTransitionModalState.nextStepType === 'send_review_copy' ||
                       doneTransitionModalState.nextStepType === 'create_related_task'
                     ) {
-                      const nextStart = snapToWorkingDay(orig.due_date || TODAY_CAIRO, 1);
+                      const nextStart = snapToWorkingDay(orig.due_date ? addCalendarDays(orig.due_date, 1) : TODAY_CAIRO, 1);
                       const nextDue = addDays(nextStart, 2);
                       const followTask = {
                         ...orig,
@@ -2676,7 +2733,7 @@ export default function App({ account, onSignOut }) {
                         title:
                           doneTransitionModalState.followUpTitle.trim() ||
                           `${orig.title} — Review Copy`,
-                        assignee_id: doneTransitionModalState.reviewerId,
+                        assignee_id: projectMap[orig.project_id]?.assignee_ids?.length === 1 ? projectMap[orig.project_id].assignee_ids[0] : doneTransitionModalState.reviewerId,
                         status: 'backlog',
                         planned_days: 2,
                         actual_days: 0,
@@ -2725,13 +2782,13 @@ export default function App({ account, onSignOut }) {
         {/* ==================================================================== */}
         {/* CREATE PROJECT / PRODUCT MODAL */}
         {/* ==================================================================== */}
-        {createHierarchyModalOpen && (
+        {createHierarchyModalOpen && currentUser.role === 'manager' && (
           <CreateProjectProductModal
-            productLines={productLines}
+            productLines={productLines.filter(project => !project.archived)}
             onClose={() => setCreateHierarchyModalOpen(false)}
             onCreateProject={(projectName, initialProductName) => {
               const newPl = {
-                id: `pl-${Date.now()}`,
+                id: crypto.randomUUID(),
                 name: projectName,
                 position: productLines.length + 1,
                 created_at: new Date().toISOString(),
@@ -2740,7 +2797,7 @@ export default function App({ account, onSignOut }) {
 
               const prodName = initialProductName.trim() || `${projectName} Core Product`;
               const newProd = {
-                id: `proj-${Date.now() + 1}`,
+                id: crypto.randomUUID(),
                 product_line_id: newPl.id,
                 name: prodName,
                 default_priority: 2,
@@ -2754,7 +2811,7 @@ export default function App({ account, onSignOut }) {
             }}
             onCreateProduct={(productLineId, productName, defaultPriority) => {
               const newProd = {
-                id: `proj-${Date.now()}`,
+                id: crypto.randomUUID(),
                 product_line_id: productLineId,
                 name: productName,
                 default_priority: Number(defaultPriority) || 2,
@@ -2773,10 +2830,10 @@ export default function App({ account, onSignOut }) {
         {/* ==================================================================== */}
         {/* NEW TASK MODAL (Planned Days, Weight 1-10, Dependency Link) */}
         {/* ==================================================================== */}
-        {newTaskModalOpen && (
+        {newTaskModalOpen && currentUser.role === 'manager' && (
           <NewTaskModal
-            productLines={productLines}
-            projects={projects}
+            productLines={productLines.filter(project => !project.archived)}
+            projects={projects.filter(product => !productLineMap[product.product_line_id]?.archived)}
             tasks={tasks}
             users={users}
             currentUser={currentUser}
@@ -2935,6 +2992,7 @@ function GanttView({
   setCollapsedGroups,
   onExpandAll,
   expandLabel,
+  checkedTasks, setCheckedTasks, onMarkDone, canEditTask, canResize, showEmptyGroups,
   onCollapseAll,
   collapseLabel,
   onSelectTask,
@@ -3019,8 +3077,9 @@ function GanttView({
     });
     return counts;
   }, [allTasks, taskMap]);
-  const rowHeight = 96;
-  const groupRowHeight = 40;
+  const rowHeight = 68;
+  const draggedTask = useRef(null);
+  const groupRowHeight = 32;
   const [compactTimeline, setCompactTimeline] = useState(() => window.matchMedia('(max-width: 767px)').matches);
   const [timelineOptionsOpen, setTimelineOptionsOpen] = useState(false);
   useEffect(() => {const query=window.matchMedia('(max-width: 767px)');const update=()=>setCompactTimeline(query.matches);query.addEventListener('change',update);return()=>query.removeEventListener('change',update);},[]);
@@ -3070,8 +3129,8 @@ function GanttView({
   };
 
   useEffect(() => {
-    scrollToDate(TODAY_CAIRO);
-  }, [periodPreset]);
+    scrollToDate(periodPreset === 'custom' ? customStart : TODAY_CAIRO);
+  }, [periodPreset, timelineStart]);
 
   // Mouse move / up listener for dragging or resizing Gantt bars
   useEffect(() => {
@@ -3085,15 +3144,16 @@ function GanttView({
     };
     const handleUp = () => {
       if (dragState && dragState.deltaDays !== 0) {
+        draggedTask.current = dragState.taskId;
+        setTimeout(() => { if (draggedTask.current === dragState.taskId) draggedTask.current = null; }, 0);
         const t = taskMap[dragState.taskId];
         if (t) {
           if (dragState.mode === 'move') {
             const rawNewStart = addCalendarDays(dragState.origStart, dragState.deltaDays);
             const snappedStart = snapToTaskWorkingDay(t, rawNewStart);
-            const newDue = addTaskDays(t, snappedStart, t.planned_days || 1);
             onUpdateTask(
               t.id,
-              { start_date: snappedStart, due_date: newDue },
+              { start_date: snappedStart },
               { allowUndo: true, actionLabel: `Moved "${t.title.slice(0, 24)}..."` }
             );
           } else if (dragState.mode === 'resize_right') {
@@ -3105,8 +3165,8 @@ function GanttView({
             );
           } else if (dragState.mode === 'resize_left') {
             const rawNewStart = addCalendarDays(dragState.origStart, dragState.deltaDays);
-            const snappedStart = snapToWorkingDay(rawNewStart, 1);
-            const newPlanned = Math.max(0.5, diffDays(snappedStart, dragState.origDue) || 1);
+            const snappedStart = snapToTaskWorkingDay(t, rawNewStart);
+            const newPlanned = taskDaysBetween(t, snappedStart, dragState.origDue);
             onUpdateTask(
               t.id,
               { start_date: snappedStart, planned_days: newPlanned },
@@ -3175,15 +3235,15 @@ function GanttView({
               .sort((a, b) => a.position - b.position);
             return { ...proj, tasks: projTasks };
           })
-          .filter((proj) => proj.tasks.length > 0);
+          .filter((proj) => showEmptyGroups || proj.tasks.length > 0);
 
         const totalTasksInPl = plProjects.reduce((acc, p) => acc + p.tasks.length, 0);
         return { ...pl, projects: plProjects, totalTasks: totalTasksInPl };
       })
-      .filter((pl) => pl.totalTasks > 0);
+      .filter((pl) => !pl.archived && (showEmptyGroups || pl.totalTasks > 0));
 
     return groups;
-  }, [productLines, projects, tasks]);
+  }, [productLines, projects, tasks, showEmptyGroups]);
 
   // Flatten visible rows for SVG dependency wire coordinates
   const visibleTaskRows = useMemo(() => {
@@ -3313,6 +3373,9 @@ function GanttView({
             <Minimize2 className="w-3.5 h-3.5 text-slate-500" />
             <span>{collapseLabel}</span>
           </button>
+          {onMarkDone && <button type="button" className="rounded-lg border px-2 py-1" onClick={() => setCheckedTasks(checkedTasks.length ? [] : tasks.filter(task => canEditTask(task) && task.status !== 'done').map(task => task.id))}>{checkedTasks.length ? 'Clear selection' : 'Select all filtered tasks'}</button>}
+          {onMarkDone && checkedTasks.length > 0 && <button type="button" className="rounded-lg bg-indigo-600 text-white px-2 py-1" onClick={() => onMarkDone(checkedTasks)}>Mark {checkedTasks.length} selected as done</button>}
+
 
           <button
             onClick={() => scrollToDate(TODAY_CAIRO)}
@@ -3592,6 +3655,8 @@ function GanttView({
                       key={d.iso}
                       style={{ width: `${dayWidth}px` }}
                       title={tooltipText}
+                      tabIndex={overloaded ? 0 : undefined}
+                      aria-label={tooltipText}
                       className={`shrink-0 border-r border-indigo-200/40 dark:border-slate-800 flex items-center justify-center text-[10px] font-extrabold transition-colors ${
                         overloaded
                           ? 'bg-rose-600 text-white'
@@ -3603,6 +3668,7 @@ function GanttView({
                       }`}
                     >
                       {load > 0 ? (dayWidth >= 28 ? `${load}/10` : load) : '·'}
+                      {overloaded && dayWidth >= 24 && <small className="text-[8px] ml-0.5" title={tooltipText}>{userMap[overlayMemberId === 'all' || overlayMemberId === 'peak' ? dayCell?.maxUserId : overlayMemberId]?.initials}</small>}
                     </div>
                   );
                 })}
@@ -3716,7 +3782,7 @@ function GanttView({
                             <span className="px-1.5 py-0.5 text-[10px] rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 uppercase">
                               Project
                             </span>
-                            <span>{pl.name}</span>
+                            <span>{pl.name} <small>{itemNumber('PRJ', pl.id)}</small></span>
                           </div>
                           <span className="text-xs px-2 py-0.5 rounded-full bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold">
                             {pl.totalTasks} tasks
@@ -3754,7 +3820,7 @@ function GanttView({
                                     <span className="px-1.5 py-0.5 text-[10px] rounded bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300">
                                       Product
                                     </span>
-                                    <span className="truncate">{proj.name}</span>
+                                    <span className="truncate">{proj.name} <small>{itemNumber('PRD', proj.id)}</small></span>
                                   </div>
                                   <span className="text-[11px] text-slate-400">{proj.tasks.length} tasks</span>
                                 </div>
@@ -3804,14 +3870,15 @@ function GanttView({
                                       {/* Left Sticky Column (Doubled Height for 2-Line Title & 2-Line Details) */}
                                       <div
                                         style={{ width: `${leftColWidth}px`, height: `${rowHeight}px` }}
-                                        onClick={() => onSelectTask(task.id)}
+                                        onClick={() => { if (task.start_date) { if (task.start_date < timelineStart || diffCalendarDays(timelineStart, task.start_date) >= totalDays) { setCustomStart(task.start_date); setCustomEnd(addCalendarDays(task.start_date, 30)); setPeriodPreset('custom'); } else scrollToDate(task.start_date); } }}
                                         onContextMenu={(event) => { event.preventDefault(); onSelectTask(task.id); }}
-                                        title="Click or right-click to open task"
+                                        title={itemNumber('T', task.id) + ' | Click to jump to the task bar; right-click to open'}
                                         className="gantt-task-label sticky left-0 z-30 bg-white dark:bg-slate-900 group-hover:bg-stone-50 dark:group-hover:bg-slate-800/95 pl-10 pr-3 py-2 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] cursor-pointer"
                                       >
-                                        <div className="min-w-0 flex-1 pr-2 space-y-1">
+                                         {onMarkDone && canEditTask(task) && task.status !== 'done' && <input type="checkbox" aria-label={'Select ' + task.title} className="mr-2" checked={checkedTasks.includes(task.id)} onClick={e=>e.stopPropagation()} onChange={e=>{const checked=e.target.checked;setCheckedTasks(previous=>checked ? [...previous, task.id] : previous.filter(id=>id!==task.id));}} />}
+                                        <div className="min-w-0 flex-1 pr-2">
                                           <div className="text-xs text-slate-800 dark:text-slate-100 font-bold leading-snug line-clamp-2">
-                                            {task.title}
+                                            {task.title} <small className="text-slate-500">{itemNumber('T', task.id)}</small>
                                           </div>
                                           <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight line-clamp-2">
                                             {task.details || 'No additional engineering details.'}
@@ -3951,6 +4018,7 @@ function GanttView({
                                           }}
                                           onClick={(e) => {
                                             e.stopPropagation();
+                                            if (draggedTask.current === task.id) { draggedTask.current = null; return; }
                                             if (!dragState || dragState.deltaDays === 0) {
                                               onSelectTask(task.id);
                                             }
@@ -3958,7 +4026,7 @@ function GanttView({
                                           title={`${task.title}\nDetails: ${task.details || ''}\nWeight: ${task.weight ?? 5}/10 | Planned: ${task.planned_days ?? 1}d | Actual: ${task.actual_days ?? 0}d${
                                             blockedDaysNum > 0 ? ` | Blocked: ${blockedDaysNum}d` : ''
                                           }\nStart: ${task.start_date} → End: ${getEffectiveEndDate(task)}`}
-                                          className={`absolute top-2.5 h-[76px] rounded-xl text-white flex flex-col justify-between px-3 py-1.5 cursor-grab active:cursor-grabbing overflow-hidden ${
+                                          className={`absolute top-2.5 h-[52px] rounded-xl text-white flex flex-col justify-between px-3 py-1.5 cursor-grab active:cursor-grabbing overflow-hidden ${
                                             isDraggingThis ? 'z-30 ring-2 ring-indigo-300 shadow-xl' : 'z-15 hover:brightness-105'
                                           } ${overdue ? 'ring-2 ring-rose-500 ring-offset-1 dark:ring-offset-slate-900' : ''} ${
                                             linkingFromTaskId && linkingFromTaskId !== task.id
@@ -3969,7 +4037,8 @@ function GanttView({
                                           <div
                                             onMouseDown={(e) => {
                                               e.stopPropagation();
-                                              setDragState({
+                                              if (!canResize) return;
+                                            setDragState({
                                                 taskId: task.id,
                                                 mode: 'resize_left',
                                                 startX: e.clientX,
@@ -4066,7 +4135,8 @@ function GanttView({
                                           <div
                                             onMouseDown={(e) => {
                                               e.stopPropagation();
-                                              setDragState({
+                                              if (!canResize) return;
+                                            setDragState({
                                                 taskId: task.id,
                                                 mode: 'resize_right',
                                                 startX: e.clientX,
@@ -4121,9 +4191,9 @@ function TaskDraftField({ taskId, field, value, onCommit, multiline = false, cla
 function TaskDraftNumber({ taskId, field, value, onCommit, disabled, className }) {
   const [draft, setDraft] = useState(String(value));
   useEffect(() => setDraft(String(value)), [taskId, value]);
-  return <input type="number" min="0" max={field === 'extra_hours_per_day' ? 15.5 : 16} step="0.5" value={draft} disabled={disabled} className={className}
+  return <input type="number" min="0" max={field === 'planned_days' ? 3660 : field === 'extra_hours_per_day' ? 15.5 : 16} step="0.5" value={draft} disabled={disabled} className={className}
     onChange={(event) => setDraft(event.target.value)}
-    onBlur={() => { const next = Math.max(0, Math.min(field === 'extra_hours_per_day' ? 15.5 : 16, Number(draft) || 0)); if (next !== Number(value)) onCommit(taskId, { [field]: next }); setDraft(String(next)); }} />;
+    onBlur={() => { const next = Math.max(0, Math.min(field === 'planned_days' ? 3660 : field === 'extra_hours_per_day' ? 15.5 : 16, Number(draft) || 0)); if (next !== Number(value)) onCommit(taskId, { [field]: next }); setDraft(String(next)); }} />;
 }
 
 function TaskDraftRange({ task, onCommit, disabled }) {
@@ -4169,7 +4239,8 @@ function TaskSidePanel({
 
   // Cascade Filters inside the Dependency Section (Project -> Product -> Task)
   const [depFilterPlId, setDepFilterPlId] = useState('');
-  const [depFilterProjId, setDepFilterProjId] = useState('');
+  const [depFilterProjId, setDepFilterProjId] = useState(task?.project_id || '');
+  useEffect(() => { setDepFilterPlId(projectMap[task?.project_id]?.product_line_id || ''); setDepFilterProjId(task?.project_id || ''); }, [task?.id, task?.project_id]);
   const [childDepToAdd, setChildDepToAdd] = useState('');
 
   if (!task) return null;
@@ -4296,7 +4367,7 @@ function TaskSidePanel({
             <div>
               <label className="text-slate-500 dark:text-slate-400 font-medium block mb-1">Assignee</label>
               <select
-                disabled={!canEdit}
+                disabled={!canEdit || currentUser.role !== 'manager'}
                 value={task.assignee_id || ''}
                 onChange={(e) => onUpdateTask(task.id, { assignee_id: e.target.value || null })}
                 className="w-full px-2.5 py-2 rounded-xl bg-stone-100 dark:bg-slate-800 font-semibold disabled:opacity-60"
@@ -4374,7 +4445,7 @@ function TaskSidePanel({
               </label>
               <input
                 type="date"
-                disabled={!canEdit}
+                disabled={!canEdit || currentUser.role !== 'manager'}
                 value={task.due_date || ''}
                 onChange={(e) => onUpdateTask(task.id, { due_date: e.target.value || null })}
                 className="w-full px-2.5 py-2 rounded-xl bg-stone-100 dark:bg-slate-800 font-semibold disabled:opacity-60"
@@ -4387,19 +4458,8 @@ function TaskSidePanel({
                 <label className="text-indigo-900 dark:text-indigo-300 font-bold block mb-1 text-[11px]">
                   Planned Time (Days)
                 </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0.5"
-                  disabled={currentUser.role !== 'manager'}
-                  value={task.planned_days ?? 1}
-                  onChange={(e) =>
-                    onUpdateTask(task.id, {
-                      planned_days: e.target.value === '' ? 1 : Number(e.target.value),
-                    })
-                  }
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 font-bold text-indigo-700 dark:text-indigo-300 disabled:opacity-60"
-                />
+                <TaskDraftNumber taskId={task.id} field="planned_days" value={task.planned_days ?? 0} onCommit={onUpdateTask}
+                  disabled={currentUser.role !== 'manager'} className="w-full rounded-lg border p-2 bg-white dark:bg-slate-900" />
               </div>
               <div>
                 <label className="text-emerald-900 dark:text-emerald-300 font-bold block mb-1 text-[11px]">
@@ -4448,13 +4508,13 @@ function TaskSidePanel({
                   ['friday_hours', 'Friday work hours'],
                   ['saturday_hours', 'Saturday work hours'],
                 ].map(([field, label]) => <label key={field} className="text-[11px] font-semibold">{label}
-                  <TaskDraftNumber key={`${task.id}:${field}`} taskId={task.id} field={field} value={task[field] || 0} onCommit={onUpdateTask} disabled={currentUser.role !== 'manager'} className="mt-1 w-full rounded-lg border p-2 bg-white dark:bg-slate-900" />
+                  <TaskDraftNumber key={`${task.id}:${field}`} taskId={task.id} field={field} value={task[field] || 0} onCommit={onUpdateTask} disabled={!canEdit} className="mt-1 w-full rounded-lg border p-2 bg-white dark:bg-slate-900" />
                 </label>)}
               </div>
             </div>
 
             <label className="col-span-2 flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
-              <input type="checkbox" checked={task.dependencies_enabled !== false} disabled={currentUser.role !== 'manager'}
+              <input type="checkbox" checked={task.dependencies_enabled !== false} disabled={!canEdit}
                 onChange={(event) => onUpdateTask(task.id, { dependencies_enabled: event.target.checked })}
                 className="accent-indigo-600" />
               Enable task dependencies
@@ -4674,10 +4734,12 @@ function TaskSidePanel({
                     setCommentInput('');
                   }
                 }}
-                placeholder="Write a comment on this task..."
+                disabled={currentUser.role === 'viewer'}
+                placeholder={currentUser.role === 'viewer' ? 'View only' : 'Write a comment on this task...'}
                 className="flex-1 px-3 py-2 rounded-xl bg-stone-100 dark:bg-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <button
+                disabled={currentUser.role === 'viewer'}
                 onClick={() => {
                   onAddComment(task.id, commentInput);
                   setCommentInput('');
@@ -4718,7 +4780,7 @@ function TaskSidePanel({
         {/* 6. Manager Actions Footer */}
         <div className="p-4 border-t border-stone-200 dark:border-slate-800 bg-stone-50 dark:bg-slate-900/90 flex items-center justify-between gap-2">
           <button
-            onClick={() => onSendReminder(task)}
+            disabled={!onSendReminder} onClick={() => onSendReminder?.(task)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/80 dark:hover:bg-amber-900 text-amber-800 dark:text-amber-300 text-xs font-semibold transition-colors"
           >
             <Bell className="w-3.5 h-3.5" />
@@ -5009,9 +5071,9 @@ function KanbanView({
                           {assignee && (
                             <span
                               title={assignee.name}
-                              className={`w-6 h-6 rounded-full ${assignee.color} text-white text-[10px] font-bold flex items-center justify-center shadow-2xs`}
+                              className={`rounded-full px-2 py-1 ${assignee.color} text-white text-[10px] font-bold`}
                             >
-                              {assignee.initials}
+                              {assignee.name}
                             </span>
                           )}
                         </div>
@@ -5238,7 +5300,7 @@ function SettingsView({
                   if (!newPlName.trim()) return;
                   setProductLines((prev) => [
                     ...prev,
-                    { id: `pl-${Date.now()}`, name: newPlName.trim(), position: prev.length + 1 },
+                    { id: crypto.randomUUID(), name: newPlName.trim(), position: prev.length + 1 },
                   ]);
                   setNewPlName('');
                   pushToast('success', 'Project Added', `Created Project "${newPlName.trim()}".`);
@@ -5276,6 +5338,7 @@ function SettingsView({
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-indigo-950 dark:text-indigo-200">
                       Project: {pl.name}
+                      {pl.archived && <button type="button" className="ml-2 text-indigo-600" onClick={() => setProductLines(previous => previous.map(project => project.id === pl.id ? { ...project, archived: false } : project))}>Restore project</button>}
                     </span>
                     <span className="text-xs text-slate-400">{plProjects.length} products</span>
                   </div>
@@ -5575,10 +5638,10 @@ function NewTaskModal({ productLines, projects, tasks, users, currentUser, defau
   const availableProducts = projects.filter((p) => !p.archived && p.product_line_id === selectedPlId);
   const [projectId, setProjectId] = useState(availableProducts[0]?.id || projects[0]?.id || '');
   const [title, setTitle] = useState('');
-  const [assigneeId, setAssigneeId] = useState(currentUser.id);
+  const [assigneeId, setAssigneeId] = useState('');
   const [priority, setPriority] = useState(2);
   const [criticality, setCriticality] = useState('high');
-  const [weight, setWeight] = useState(5);
+  const [weight, setWeight] = useState(10);
   const [status, setStatus] = useState(defaultStatus || 'backlog');
   const [startDate, setStartDate] = useState(TODAY_CAIRO);
   const [plannedDays, setPlannedDays] = useState(3);
@@ -5660,8 +5723,10 @@ function NewTaskModal({ productLines, projects, tasks, users, currentUser, defau
                 onChange={(e) => setAssigneeId(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-slate-800"
               >
+                <option value="">Unassigned</option>
                 {users
-                  .filter((u) => u.is_active)
+                  .filter((u) => u.is_active && u.role !== 'viewer')
+                  .sort((a,b) => Number((projects.find(p=>p.id===projectId)?.assignee_ids || []).includes(b.id)) - Number((projects.find(p=>p.id===projectId)?.assignee_ids || []).includes(a.id)))
                   .map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name}
@@ -5787,7 +5852,7 @@ function NewTaskModal({ productLines, projects, tasks, users, currentUser, defau
                 project_id: projectId,
                 title: title.trim(),
                 details: '',
-                assignee_id: assigneeId || null,
+                assignee_id: (projects.find(product => product.id === projectId)?.assignee_ids?.length === 1 ? projects.find(product => product.id === projectId).assignee_ids[0] : assigneeId) || null,
                 priority,
                 criticality,
                 weight,

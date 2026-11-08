@@ -22,7 +22,7 @@ export function snapToTaskWorkingDay(task, iso) {
   return current;
 }
 
-// Due dates are exclusive, matching the existing addDays behavior.
+// Due dates include the last day worked.
 export function addTaskDays(task, startIso, plannedDays) {
   const start = snapToTaskWorkingDay(task, startIso);
   if (!start) return null;
@@ -32,19 +32,19 @@ export function addTaskDays(task, startIso, plannedDays) {
   for (let i = 0; i < 3660; i++) {
     if (remaining <= 0) return current;
     remaining -= taskHoursOnDate(task, current);
+    if (remaining <= 1e-9) return current;
     current = nextDate(date);
-    if (remaining <= 0) return snapToTaskWorkingDay(task, current);
   }
   return null;
 }
 
 export function taskDaysBetween(task, startIso, endIso) {
-  if (!startIso || !endIso || endIso <= startIso) return 0.5;
+  if (!startIso || !endIso || endIso < startIso) return 0.5;
   const date = dateAtUtc(startIso);
   if (Number.isNaN(date.getTime())) return 0.5;
   let current = startIso;
   let hours = 0;
-  for (let i = 0; i < 3660 && current < endIso; i++) {
+  for (let i = 0; i < 3660 && current <= endIso; i++) {
     hours += taskHoursOnDate(task, current);
     current = nextDate(date);
   }
