@@ -259,10 +259,10 @@ const CRITICALITY_META = {
 };
 
 // Helper: Check if a YYYY-MM-DD falls on Egyptian weekend (Friday = 5, Saturday = 6)
-function itemNumber(prefix, id) {
+function itemNumber(id) {
   let n = 0n;
-  for (const c of String(id)) n = (n * 131n + BigInt(c.codePointAt(0))) % 10000000000000n;
-  return prefix + '-' + n.toString().padStart(13, '0');
+  for (const c of String(id)) n = (n * 131n + BigInt(c.codePointAt(0))) % 10000n;
+  return n.toString().padStart(4, '0');
 }
 
 function isWeekendCairo(dateStr) {
@@ -348,7 +348,8 @@ function diffDays(startStr, endStr) {
 
 function isTaskOverdue(task) {
   if (!task || task.status === 'done') return false;
-  if (task.due_date && task.due_date < TODAY_CAIRO) return true;
+  const plannedEnd = getPlannedEndDate(task);
+  if (plannedEnd && plannedEnd < TODAY_CAIRO) return true;
   if (
     task.status === 'in_progress' &&
     Number(task.actual_days) > 0 &&
@@ -360,9 +361,16 @@ function isTaskOverdue(task) {
   return false;
 }
 
+function getPlannedEndDate(task) {
+  if (task.start_date && task.due_date && Number(task.planned_days) > 0) {
+    return addTaskDays(task, task.start_date, task.planned_days) || task.due_date;
+  }
+  return task.due_date || null;
+}
+
 function getEffectiveEndDate(task) {
   if (!task || !task.start_date) return null;
-  const baseDue = task.due_date || addTaskDays(task, task.start_date, task.planned_days || 1);
+  const baseDue = getPlannedEndDate(task) || addTaskDays(task, task.start_date, task.planned_days || 1);
   const blockedExtra = Number(task.blocked_days) > 0 ? Number(task.blocked_days) : 0;
   return blockedExtra > 0 ? addTaskDays(task, addCalendarDays(baseDue, 1), blockedExtra) : baseDue;
 }
@@ -1129,7 +1137,7 @@ export default function App({ account, onSignOut }) {
     ? 'Collapse Products to Projects'
     : 'All Collapsed';
 
-  const markSelectedDone = (ids) => {
+  const updateSelectedStatus = (ids, status, reason) => {
     const pending = new Set(ids);
     const next = tasks.map(task => ({ ...task }));
     const lookup = new Map(next.map(task => [task.id, task]));
@@ -1138,21 +1146,28 @@ export default function App({ account, onSignOut }) {
     for (let progress = true; progress;) {
       progress = false;
       for (const task of next) {
-        if (!pending.has(task.id) || task.status === 'done' || !canEditTask(task)) continue;
-        if (task.depends_on_id && lookup.get(task.depends_on_id)?.status !== 'done') continue;
-        Object.assign(task, { status: 'done', actual_days: Number(task.actual_days) || Number(task.planned_days) || 1,
-          updated_at: timestamp, completed_at: timestamp });
+        if (!pending.has(task.id) || !canEditTask(task)) continue;
+        if (task.status === status) {
+          pending.delete(task.id);
+          continue;
+        }
+        if (status === 'done' && task.depends_on_id && lookup.get(task.depends_on_id)?.status !== 'done') continue;
+        task.status = status;
+        task.updated_at = timestamp;
+        task.completed_at = status === 'done' ? timestamp : null;
+        if (status === 'done') task.actual_days = Number(task.actual_days) || Number(task.planned_days) || 1;
+        if (status === 'blocked') task.blocked_reason = reason;
         pending.delete(task.id);
         count++;
         progress = true;
       }
     }
     if (count) {
-      setUndoHistory(previous => [...previous.slice(-29), { tasksSnapshot: tasks, label: 'Mark selected tasks done' }]);
+      setUndoHistory(previous => [...previous.slice(-29), { tasksSnapshot: tasks, label: 'Update selected task statuses' }]);
       setTasks(next);
     }
     setCheckedTasks([...pending]);
-    pushToast(count ? 'success' : 'info', count + ' tasks marked done', pending.size + ' skipped.');
+    pushToast(count ? 'success' : 'info', count + ' task statuses updated', pending.size + ' skipped.');
   };
 
   const filteredTasks = useMemo(() => {
@@ -1194,7 +1209,7 @@ export default function App({ account, onSignOut }) {
         const plName = productLineMap[proj.product_line_id]?.name || '';
         const assigneeName = t.assignee_id ? userMap[t.assignee_id]?.name || '' : '';
         const match =
-          [itemNumber('T', t.id), itemNumber('PRD', proj.id), itemNumber('PRJ', proj.product_line_id)]
+          [itemNumber(t.id), itemNumber(proj.id), itemNumber(proj.product_line_id)]
             .some(number => number.toLowerCase().includes(q.replace(/^#/, ''))) ||
           (t.title || '').toLowerCase().includes(q) ||
           (t.details || '').toLowerCase().includes(q) ||
@@ -1415,6 +1430,10 @@ export default function App({ account, onSignOut }) {
     }
     if (patch.due_date) {
       updated.due_date = snapToTaskWorkingDay(updated, patch.due_date);
+      if (!updated.start_date || updated.due_date < updated.start_date) {
+        pushToast('error', 'Invalid end date', 'Choose an end date on or after the start date.');
+        return false;
+      }
     }
 
     // Planned Time (`planned_days`) is the main duration driver on the Gantt chart
@@ -1425,11 +1444,11 @@ export default function App({ account, onSignOut }) {
         updated.due_date = pDays ? addTaskDays(updated, updated.start_date, pDays) : null;
       }
     } else if (patch.start_date !== undefined && patch.due_date !== undefined) {
-      updated.planned_days = taskDaysBetween(updated, updated.start_date, updated.due_date);
+      updated.planned_days = updated.start_date && updated.due_date ? taskDaysBetween(updated, updated.start_date, updated.due_date) : 0;
     } else if (patch.start_date !== undefined && !patch.due_date && updated.planned_days != null) {
       updated.due_date = Number(updated.planned_days) > 0 ? addTaskDays(updated, updated.start_date, updated.planned_days) : null;
     } else if (patch.due_date !== undefined && updated.start_date) {
-      updated.planned_days = taskDaysBetween(updated, updated.start_date, updated.due_date);
+      updated.planned_days = updated.start_date && updated.due_date ? taskDaysBetween(updated, updated.start_date, updated.due_date) : 0;
     }
 
     if (['extra_hours_per_day', 'friday_hours', 'saturday_hours'].some((field) => patch[field] !== undefined)) {
@@ -2220,7 +2239,7 @@ export default function App({ account, onSignOut }) {
           {shared && !projects.length && activeTab === 'dashboard' && <p className="mb-2 rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
             {account.role === 'manager' ? 'Create a project and a product to start saving shared tasks.' : 'Your shared workspace is empty. Tasks will appear here once a manager adds them.'}
           </p>}
-          {activeTab === 'dashboard' && <Dashboard tasks={tasks} projects={projects} users={users} currentUser={currentUser} onSelectTask={setSelectedTaskId} onOpenGantt={()=>setActiveTab('gantt')}/>}
+          {activeTab === 'dashboard' && <Dashboard tasks={tasks} projects={projects} users={users} currentUser={currentUser} onSelectTask={setSelectedTaskId} onOpenGantt={()=>setActiveTab('gantt')} itemNumber={itemNumber}/>}
           {activeTab === 'gantt' && (
             <GanttView
               controlsVisible={ganttControls || ganttExpanded}
@@ -2239,7 +2258,7 @@ export default function App({ account, onSignOut }) {
               setCollapsedGroups={setCollapsedGroups}
               checkedTasks={checkedTasks}
               setCheckedTasks={setCheckedTasks}
-              onMarkDone={currentUser.role === 'viewer' ? null : markSelectedDone}
+              onBulkStatusChange={currentUser.role === 'viewer' ? null : updateSelectedStatus}
               canEditTask={canEditTask}
               canResize={currentUser.role === 'manager'}
               showEmptyGroups={!searchQuery.trim() && !myTasksOnly && !overdueOnly && !selectedAssignees.length && !selectedProductLines.length && !selectedProjects.length && !selectedPriorities.length && !selectedCriticalities.length && !selectedStatuses.length}
@@ -2677,7 +2696,7 @@ export default function App({ account, onSignOut }) {
 
               <div>
                 <label className="text-xs font-semibold text-slate-500 block mb-1">
-                  Completion / Handover Note (Required)
+                  Completion / Handover Note (Optional)
                 </label>
                 <textarea
                   rows={2}
@@ -2701,11 +2720,6 @@ export default function App({ account, onSignOut }) {
                   onClick={() => {
                     const orig = tasks.find((t) => t.id === doneTransitionModalState.taskId);
                     if (!orig) return;
-                    if (!doneTransitionModalState.note.trim()) {
-                      pushToast('error', 'Note Required', 'Please enter a completion/next-step note.');
-                      return;
-                    }
-
                     const actDays = Math.max(0.5, Number(doneTransitionModalState.actualDays) || orig.planned_days || 1);
                     if (!updateTask(
                       orig.id,
@@ -2716,7 +2730,7 @@ export default function App({ account, onSignOut }) {
                       { allowUndo: true, actionLabel: 'Task marked Done' }
                     )) return;
 
-                    handleAddComment(
+                    if (doneTransitionModalState.note.trim()) handleAddComment(
                       orig.id,
                       `[Transition → Done | Next Step: ${doneTransitionModalState.nextStepType}]: ${doneTransitionModalState.note.trim()}`
                     );
@@ -2726,7 +2740,7 @@ export default function App({ account, onSignOut }) {
                       doneTransitionModalState.nextStepType === 'create_related_task'
                     ) {
                       const nextStart = snapToWorkingDay(orig.due_date ? addCalendarDays(orig.due_date, 1) : TODAY_CAIRO, 1);
-                      const nextDue = addDays(nextStart, 2);
+                      const nextDue = addTaskDays({}, nextStart, 2);
                       const followTask = {
                         ...orig,
                         id: `task-${Date.now()}`,
@@ -2992,7 +3006,7 @@ function GanttView({
   setCollapsedGroups,
   onExpandAll,
   expandLabel,
-  checkedTasks, setCheckedTasks, onMarkDone, canEditTask, canResize, showEmptyGroups,
+  checkedTasks, setCheckedTasks, onBulkStatusChange, canEditTask, canResize, showEmptyGroups,
   onCollapseAll,
   collapseLabel,
   onSelectTask,
@@ -3079,6 +3093,8 @@ function GanttView({
   }, [allTasks, taskMap]);
   const rowHeight = 68;
   const draggedTask = useRef(null);
+  const [bulkStatus, setBulkStatus] = useState('done');
+  const [bulkReason, setBulkReason] = useState('');
   const groupRowHeight = 32;
   const [compactTimeline, setCompactTimeline] = useState(() => window.matchMedia('(max-width: 767px)').matches);
   const [timelineOptionsOpen, setTimelineOptionsOpen] = useState(false);
@@ -3373,8 +3389,17 @@ function GanttView({
             <Minimize2 className="w-3.5 h-3.5 text-slate-500" />
             <span>{collapseLabel}</span>
           </button>
-          {onMarkDone && <button type="button" className="rounded-lg border px-2 py-1" onClick={() => setCheckedTasks(checkedTasks.length ? [] : tasks.filter(task => canEditTask(task) && task.status !== 'done').map(task => task.id))}>{checkedTasks.length ? 'Clear selection' : 'Select all filtered tasks'}</button>}
-          {onMarkDone && checkedTasks.length > 0 && <button type="button" className="rounded-lg bg-indigo-600 text-white px-2 py-1" onClick={() => onMarkDone(checkedTasks)}>Mark {checkedTasks.length} selected as done</button>}
+          {onBulkStatusChange && <button type="button" className="rounded-lg border px-2 py-1" onClick={() => setCheckedTasks(checkedTasks.length ? [] : tasks.filter(task => canEditTask(task)).map(task => task.id))}>{checkedTasks.length ? 'Clear selection' : 'Select all filtered tasks'}</button>}
+          {onBulkStatusChange && checkedTasks.length > 0 && <div className="flex flex-wrap items-center gap-2">
+            <select aria-label="Status for selected tasks" value={bulkStatus} onChange={event => setBulkStatus(event.target.value)} className="rounded-lg border px-2 py-1 dark:bg-slate-900">
+              {Object.entries(STATUS_META).map(([status, meta]) => <option key={status} value={status}>{meta.label}</option>)}
+            </select>
+            {bulkStatus === 'blocked' && <input aria-label="Blocked reason for selected tasks" placeholder="Blocked reason" value={bulkReason}
+              onChange={event => setBulkReason(event.target.value)} className="rounded-lg border px-2 py-1 dark:bg-slate-900" />}
+            <button type="button" className="rounded-lg bg-indigo-600 text-white px-2 py-1 disabled:opacity-50"
+              disabled={bulkStatus === 'blocked' && !bulkReason.trim()}
+              onClick={() => onBulkStatusChange(checkedTasks, bulkStatus, bulkReason.trim())}>Apply to {checkedTasks.length} selected</button>
+          </div>}
 
 
           <button
@@ -3782,7 +3807,7 @@ function GanttView({
                             <span className="px-1.5 py-0.5 text-[10px] rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 uppercase">
                               Project
                             </span>
-                            <span>{pl.name} <small>{itemNumber('PRJ', pl.id)}</small></span>
+                            <span>{pl.name} <small>{itemNumber(pl.id)}</small></span>
                           </div>
                           <span className="text-xs px-2 py-0.5 rounded-full bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold">
                             {pl.totalTasks} tasks
@@ -3820,7 +3845,7 @@ function GanttView({
                                     <span className="px-1.5 py-0.5 text-[10px] rounded bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300">
                                       Product
                                     </span>
-                                    <span className="truncate">{proj.name} <small>{itemNumber('PRD', proj.id)}</small></span>
+                                    <span className="truncate">{proj.name} <small>{itemNumber(proj.id)}</small></span>
                                   </div>
                                   <span className="text-[11px] text-slate-400">{proj.tasks.length} tasks</span>
                                 </div>
@@ -3872,13 +3897,13 @@ function GanttView({
                                         style={{ width: `${leftColWidth}px`, height: `${rowHeight}px` }}
                                         onClick={() => { if (task.start_date) { if (task.start_date < timelineStart || diffCalendarDays(timelineStart, task.start_date) >= totalDays) { setCustomStart(task.start_date); setCustomEnd(addCalendarDays(task.start_date, 30)); setPeriodPreset('custom'); } else scrollToDate(task.start_date); } }}
                                         onContextMenu={(event) => { event.preventDefault(); onSelectTask(task.id); }}
-                                        title={itemNumber('T', task.id) + ' | Click to jump to the task bar; right-click to open'}
+                                        title={itemNumber(task.id) + ' | Click to jump to the task bar; right-click to open'}
                                         className="gantt-task-label sticky left-0 z-30 bg-white dark:bg-slate-900 group-hover:bg-stone-50 dark:group-hover:bg-slate-800/95 pl-10 pr-3 py-2 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] cursor-pointer"
                                       >
-                                         {onMarkDone && canEditTask(task) && task.status !== 'done' && <input type="checkbox" aria-label={'Select ' + task.title} className="mr-2" checked={checkedTasks.includes(task.id)} onClick={e=>e.stopPropagation()} onChange={e=>{const checked=e.target.checked;setCheckedTasks(previous=>checked ? [...previous, task.id] : previous.filter(id=>id!==task.id));}} />}
+                                         {onBulkStatusChange && canEditTask(task) && <input type="checkbox" aria-label={'Select ' + task.title} className="mr-2" checked={checkedTasks.includes(task.id)} onClick={e=>e.stopPropagation()} onChange={e=>{const checked=e.target.checked;setCheckedTasks(previous=>checked ? [...previous, task.id] : previous.filter(id=>id!==task.id));}} />}
                                         <div className="min-w-0 flex-1 pr-2">
                                           <div className="text-xs text-slate-800 dark:text-slate-100 font-bold leading-snug line-clamp-2">
-                                            {task.title} <small className="text-slate-500">{itemNumber('T', task.id)}</small>
+                                            {task.title} <small className="text-slate-500">{itemNumber(task.id)}</small>
                                           </div>
                                           <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight line-clamp-2">
                                             {task.details || 'No additional engineering details.'}
@@ -3990,7 +4015,7 @@ function GanttView({
                                               mode: 'move',
                                               startX: e.clientX,
                                               origStart: task.start_date,
-                                              origDue: task.due_date,
+                                              origDue: getPlannedEndDate(task),
                                               origPlanned: task.planned_days || 1,
                                               deltaDays: 0,
                                             });
@@ -4023,7 +4048,7 @@ function GanttView({
                                               onSelectTask(task.id);
                                             }
                                           }}
-                                          title={`${task.title}\nDetails: ${task.details || ''}\nWeight: ${task.weight ?? 5}/10 | Planned: ${task.planned_days ?? 1}d | Actual: ${task.actual_days ?? 0}d${
+                                          title={`#${itemNumber(task.id)} ${task.title}\nDetails: ${task.details || ''}\nWeight: ${task.weight ?? 5}/10 | Planned: ${task.planned_days ?? 1}d | Actual: ${task.actual_days ?? 0}d${
                                             blockedDaysNum > 0 ? ` | Blocked: ${blockedDaysNum}d` : ''
                                           }\nStart: ${task.start_date} → End: ${getEffectiveEndDate(task)}`}
                                           className={`absolute top-2.5 h-[52px] rounded-xl text-white flex flex-col justify-between px-3 py-1.5 cursor-grab active:cursor-grabbing overflow-hidden ${
@@ -4043,7 +4068,7 @@ function GanttView({
                                                 mode: 'resize_left',
                                                 startX: e.clientX,
                                                 origStart: task.start_date,
-                                                origDue: task.due_date,
+                                                origDue: getPlannedEndDate(task),
                                                 origPlanned: task.planned_days || 1,
                                                 deltaDays: 0,
                                               });
@@ -4083,6 +4108,7 @@ function GanttView({
                                               <span className="text-[8px] font-extrabold px-1 py-0.2 rounded bg-black/35 text-white shrink-0 uppercase">
                                                 {cMeta?.label}
                                               </span>
+                                              <span className="text-[10px] font-bold shrink-0">{itemNumber(task.id)}</span>
                                               <span className="text-[11px] font-bold truncate">{task.title}</span>
                                             </div>
 
@@ -4141,7 +4167,7 @@ function GanttView({
                                                 mode: 'resize_right',
                                                 startX: e.clientX,
                                                 origStart: task.start_date,
-                                                origDue: task.due_date,
+                                                origDue: getPlannedEndDate(task),
                                                 origPlanned: task.planned_days || 1,
                                                 deltaDays: 0,
                                               });
@@ -4317,6 +4343,7 @@ function TaskSidePanel({
               </button>
             </div>
 
+            <span className="text-xs font-semibold text-slate-500">Task {itemNumber(task.id)}</span>
             <TaskDraftField key={`${task.id}:title`} taskId={task.id} field="title" value={task.title} onCommit={onUpdateTask} disabled={!canEdit}
               className="w-full font-bold text-lg text-slate-900 dark:text-white bg-transparent border-b border-transparent focus:border-indigo-500 focus:outline-none disabled:opacity-70" />
 
@@ -4446,7 +4473,8 @@ function TaskSidePanel({
               <input
                 type="date"
                 disabled={!canEdit || currentUser.role !== 'manager'}
-                value={task.due_date || ''}
+                min={task.start_date || undefined}
+                value={getPlannedEndDate(task) || ''}
                 onChange={(e) => onUpdateTask(task.id, { due_date: e.target.value || null })}
                 className="w-full px-2.5 py-2 rounded-xl bg-stone-100 dark:bg-slate-800 font-semibold disabled:opacity-60"
               />
@@ -5025,7 +5053,7 @@ function KanbanView({
                       </div>
 
                       <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
-                        {task.title}
+                        <span className="mr-1 text-xs text-slate-500">{itemNumber(task.id)}</span>{task.title}
                       </h4>
 
                       {depTask && (
@@ -5044,7 +5072,7 @@ function KanbanView({
                       <div className="flex items-center justify-between pt-1.5 border-t border-black/5 dark:border-white/5 text-[11px] text-slate-600 dark:text-slate-300">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className={overdue ? 'text-rose-600 dark:text-rose-400 font-bold' : ''}>
-                            {task.due_date ? formatShortDate(task.due_date) : 'No date'}
+                            {getPlannedEndDate(task) ? formatShortDate(getPlannedEndDate(task)) : 'No date'}
                           </span>
                           <span className="px-1.5 py-0.2 rounded bg-white/80 dark:bg-slate-800 font-bold text-[10px] text-indigo-700 dark:text-indigo-300">
                             Plan: {task.planned_days ?? 1}d
