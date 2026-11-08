@@ -371,8 +371,13 @@ function getPlannedEndDate(task) {
 function getEffectiveEndDate(task) {
   if (!task || !task.start_date) return null;
   const baseDue = getPlannedEndDate(task) || addTaskDays(task, task.start_date, task.planned_days || 1);
-  const blockedExtra = Number(task.blocked_days) > 0 ? Number(task.blocked_days) : 0;
-  return blockedExtra > 0 ? addTaskDays(task, addCalendarDays(baseDue, 1), blockedExtra) : baseDue;
+  return getBlockedEndDate(task, baseDue);
+}
+
+function getBlockedEndDate(task, plannedEnd) {
+  const blockedDays = Number(task.blocked_days);
+  if (!plannedEnd || !(blockedDays > 0)) return plannedEnd;
+  return addTaskDays(task, addCalendarDays(plannedEnd, 1), blockedDays) || plannedEnd;
 }
 
 function formatShortDate(dateStr) {
@@ -3295,25 +3300,25 @@ function GanttView({
 
   const getBarCoordinates = (task) => {
     let startIso = task.start_date;
-    let endIso = getEffectiveEndDate(task) || task.due_date;
+    let plannedEnd = getPlannedEndDate(task);
 
-    if (dragState && dragState.taskId === task.id) {
-      if (dragState.mode === 'move') {
-        startIso = addCalendarDays(dragState.origStart, dragState.deltaDays);
-        endIso = addCalendarDays(dragState.origDue, dragState.deltaDays);
-      } else if (dragState.mode === 'resize_right') {
-        const tempPlanned = Math.max(0.5, Number(dragState.origPlanned) + dragState.deltaDays);
-        endIso = addTaskDays(task, startIso, tempPlanned);
-      } else if (dragState.mode === 'resize_left') {
-        startIso = addCalendarDays(dragState.origStart, dragState.deltaDays);
+    if (dragState?.taskId === task.id && dragState.deltaDays !== 0) {
+      const { mode, origStart, origDue, origPlanned, deltaDays } = dragState;
+      if (mode === 'move' || mode === 'resize_left') {
+        startIso = snapToTaskWorkingDay(task, addCalendarDays(origStart, deltaDays));
       }
+      let plannedDays = Number(origPlanned);
+      if (mode === 'resize_right') plannedDays = Math.max(0.5, plannedDays + deltaDays);
+      if (mode === 'resize_left') plannedDays = taskDaysBetween(task, startIso, origDue);
+      plannedEnd = addTaskDays(task, startIso, plannedDays) || plannedEnd;
     }
 
-    const startOffset = diffCalendarDays(timelineStart, startIso);
-    const spanCalendarDays = Math.max(1, diffCalendarDays(startIso, endIso) + 1);
-    const leftPx = startOffset * dayWidth;
-    const widthPx = Math.max(dayWidth * 0.85, spanCalendarDays * dayWidth - 4);
-    return { leftPx, widthPx };
+    const endIso = getBlockedEndDate(task, plannedEnd);
+    const leftPx = diffCalendarDays(timelineStart, startIso) * dayWidth;
+    const span = Math.max(1, diffCalendarDays(startIso, endIso) + 1);
+    const widthPx = Math.max(dayWidth * 0.85, span * dayWidth - 4);
+    const blockedWidthPx = Math.max(0, diffCalendarDays(plannedEnd, endIso) * dayWidth - 4);
+    return { leftPx, widthPx, startIso, plannedEnd, endIso, blockedWidthPx };
   };
 
   const todayOffsetDays = diffCalendarDays(timelineStart, TODAY_CAIRO);
@@ -3858,7 +3863,7 @@ function GanttView({
                                   const assignee = task.assignee_id ? userMap[task.assignee_id] : null;
                                   const overdue = isTaskOverdue(task);
                                   const scheduled = Boolean(task.start_date && task.due_date);
-                                  const { leftPx, widthPx } = scheduled
+                                  const { leftPx, widthPx, startIso, plannedEnd, endIso, blockedWidthPx } = scheduled
                                     ? getBarCoordinates(task)
                                     : { leftPx: 0, widthPx: 0 };
                                   const pMeta = PRIORITY_META[task.priority] || PRIORITY_META[3];
@@ -3880,11 +3885,7 @@ function GanttView({
                                   const actualWidthPx = actualSpanDays * dayWidth - 4;
 
                                   const blockedDaysNum = Number(task.blocked_days) || 0;
-                                  const totalBarDays = Math.max(1, (Number(task.planned_days) || 1) + blockedDaysNum);
-                                  const blockedWidthPct =
-                                    blockedDaysNum > 0
-                                      ? Math.min(75, Math.max(18, Math.round((blockedDaysNum / totalBarDays) * 100)))
-                                      : 0;
+
 
                                   return (
                                     <div
@@ -4050,7 +4051,7 @@ function GanttView({
                                           }}
                                           title={`#${itemNumber(task.id)} ${task.title}\nDetails: ${task.details || ''}\nWeight: ${task.weight ?? 5}/10 | Planned: ${task.planned_days ?? 1}d | Actual: ${task.actual_days ?? 0}d${
                                             blockedDaysNum > 0 ? ` | Blocked: ${blockedDaysNum}d` : ''
-                                          }\nStart: ${task.start_date} → End: ${getEffectiveEndDate(task)}`}
+                                          }\nStart: ${startIso} → Planned end: ${plannedEnd}${blockedWidthPx > 0 ? `\nBlocked through: ${endIso}` : ''}`}
                                           className={`absolute top-2.5 h-[52px] rounded-xl text-white flex flex-col justify-between px-3 py-1.5 cursor-grab active:cursor-grabbing overflow-hidden ${
                                             isDraggingThis ? 'z-30 ring-2 ring-indigo-300 shadow-xl' : 'z-15 hover:brightness-105'
                                           } ${overdue ? 'ring-2 ring-rose-500 ring-offset-1 dark:ring-offset-slate-900' : ''} ${
@@ -4079,7 +4080,7 @@ function GanttView({
                                           {blockedDaysNum > 0 && (
                                             <div
                                               style={{
-                                                width: `${blockedWidthPct}%`,
+                                                width: `${blockedWidthPx}px`,
                                                 backgroundImage:
                                                   'repeating-linear-gradient(45deg, rgba(245,158,11,0.92), rgba(245,158,11,0.92) 6px, rgba(180,83,9,0.92) 6px, rgba(180,83,9,0.92) 12px)',
                                               }}
