@@ -41,7 +41,9 @@ export default function AdminPage({ onBack }) {
     if (selected.is_active && !draftActive && !confirmed) return;
     setSaving(true); setError(''); setMessage('');
     try {
-      if (selected.id && (draftRole === 'viewer' || selected.role === 'viewer')) {
+      const identityUnchanged = draftName.trim() === selected.name &&
+        draftEmail.trim().toLowerCase() === selected.email?.toLowerCase();
+      if (selected.id && (identityUnchanged || draftRole === 'viewer' || selected.role === 'viewer')) {
         const { error } = await supabase.rpc('admin_update_user', { target_id: selected.id, new_role: draftRole, active: draftActive });
         if (error) throw error;
         setMessage('Workspace role and access updated.');
