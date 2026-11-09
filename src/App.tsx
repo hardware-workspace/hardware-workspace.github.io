@@ -3372,25 +3372,26 @@ function GanttView({
   };
 
   const renderGroupSchedule = (groupTasks) => {
-    const changes = new Int32Array(totalDays + 1);
+    const tasksByDay = Array.from({ length: totalDays }, () => []);
     for (const task of groupTasks) {
       if (!task.start_date || !task.due_date) continue;
       const start = Math.max(0, diffCalendarDays(timelineStart, task.start_date));
       const end = Math.min(totalDays - 1, diffCalendarDays(timelineStart, getPlannedEndDate(task)));
-      if (start > end) continue;
-      changes[start]++;
-      changes[end + 1]--;
+      for (let index = start; index <= end; index++) tasksByDay[index].push(task);
     }
 
-    let count = 0;
     return daysArray.map((day, index) => {
-      count += changes[index];
-      if (!count) return null;
-      const label = `${day.iso}: ${count} scheduled ${count === 1 ? 'task' : 'tasks'}`;
-      return <span key={day.iso} title={label}
-        className="absolute top-1/2 h-2 -translate-y-1/2 border-r border-white/40 bg-indigo-500 dark:bg-indigo-400"
-        style={{ left: index * dayWidth, width: dayWidth, opacity: Math.min(0.85, 0.45 + count * 0.1) }}
-      />;
+      const scheduled = tasksByDay[index];
+      if (!scheduled.length) return null;
+      const entries = scheduled.map(task => `• ${task.title} — ${STATUS_META[task.status]?.label || task.status}`);
+      const label = [day.iso, ...entries].join('\n');
+      return (
+        <span key={day.iso} title={label} className="absolute inset-y-0"
+          style={{ left: index * dayWidth, width: dayWidth }}>
+          <span className="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 border-r border-white/40 bg-indigo-500 dark:bg-indigo-400"
+            style={{ opacity: Math.min(0.85, 0.45 + scheduled.length * 0.1) }} />
+        </span>
+      );
     });
   };
 
