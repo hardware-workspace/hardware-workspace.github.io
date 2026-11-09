@@ -1038,6 +1038,16 @@ export default function App({ account, onSignOut }) {
   const [doneTransitionModalState, setDoneTransitionModalState] = useState(null);
   const [createHierarchyModalOpen, setCreateHierarchyModalOpen] = useState(false);
   const [newTaskModalOpen, setNewTaskModalOpen] = useState(false);
+  const [creationTarget, setCreationTarget] = useState(null);
+  const [groupMenu, setGroupMenu] = useState(null);
+  useEffect(() => {
+    if (!newTaskModalOpen && !createHierarchyModalOpen) setCreationTarget(null);
+  }, [newTaskModalOpen, createHierarchyModalOpen]);
+  const appendTask = (task) => setTasks(previous => {
+    const lastPosition = previous.reduce((last, item) => item.project_id === task.project_id
+      ? Math.max(last, Number(item.position) || 0) : last, 0);
+    return [...previous, { ...task, position: lastPosition + 1 }];
+  });
   const [newTaskDefaultStatus, setNewTaskDefaultStatus] = useState('backlog');
   const [splitTaskModalTarget, setSplitTaskModalTarget] = useState(null);
   const [dryRunModalOpen, setDryRunModalOpen] = useState(false);
@@ -1289,7 +1299,8 @@ export default function App({ account, onSignOut }) {
       }
 
       if (e.key === 'Escape') {
-        if (doneTransitionModalState) setDoneTransitionModalState(null);
+        if (groupMenu) setGroupMenu(null);
+        else if (doneTransitionModalState) setDoneTransitionModalState(null);
         else if (blockedModalState) setBlockedModalState(null);
         else if (inProgressModalState) setInProgressModalState(null);
         else if (splitTaskModalTarget) setSplitTaskModalTarget(null);
@@ -1343,7 +1354,7 @@ export default function App({ account, onSignOut }) {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [tasks, undoHistory, currentUser, doneTransitionModalState, blockedModalState, inProgressModalState, splitTaskModalTarget, editingProduct, editingProject, createHierarchyModalOpen, newTaskModalOpen, dryRunModalOpen, shortcutModalOpen]);
+  }, [tasks, undoHistory, currentUser, groupMenu, doneTransitionModalState, blockedModalState, inProgressModalState, splitTaskModalTarget, editingProduct, editingProject, createHierarchyModalOpen, newTaskModalOpen, dryRunModalOpen, shortcutModalOpen]);
 
   // Initial Rule: Auto-push any dependent task whose prerequisite is not Done yet
   const cascadeDependentTasks = (taskList, changedTaskId) => {
@@ -2277,8 +2288,11 @@ export default function App({ account, onSignOut }) {
               onCollapseAll={collapseAllGanttGroups}
               collapseLabel={ganttCollapseLabel}
               onSelectTask={(taskId) => setSelectedTaskId(taskId)}
-              onEditProject={currentUser.role === 'manager' ? (pl) => setEditingProject({ id: pl.id, name: pl.name, description: pl.description || '' }) : null}
-              onEditProduct={currentUser.role === 'manager' ? (product) => setEditingProduct({ id: product.id, name: product.name, description: product.description || '', assignee_ids: product.assignee_ids || [] }) : null}
+              onGroupMenu={currentUser.role === 'manager' ? (event, kind, item) => {
+                event.preventDefault();
+                setGroupMenu({ kind, item, x: Math.max(0, Math.min(event.clientX, window.innerWidth - 180)),
+                  y: Math.max(0, Math.min(event.clientY, window.innerHeight - 90)) });
+              } : null}
               onUpdateTask={updateTask}
               onRequestSplitTask={(task) => { if (currentUser.role === 'manager') setSplitTaskModalTarget(task); }}
               pushToast={pushToast}
@@ -2327,7 +2341,7 @@ export default function App({ account, onSignOut }) {
                     updated_at: new Date().toISOString(),
                     completed_at: status === 'done' ? new Date().toISOString() : null,
                   };
-                  setTasks((prev) => [newTask, ...prev]);
+                  appendTask(newTask);
                   pushToast('success', 'Task Created', `Added "${title}" to ${STATUS_META[status].label}.`);
                 }}
               />
@@ -2376,6 +2390,28 @@ export default function App({ account, onSignOut }) {
         </nav>
 
         {/* ==================================================================== */}
+        {groupMenu && currentUser.role === 'manager' && <div className="fixed inset-0 z-50"
+          onClick={() => setGroupMenu(null)} onContextMenu={event => { event.preventDefault(); setGroupMenu(null); }}>
+          <div className="fixed w-44 rounded-lg border bg-white p-1 shadow-lg dark:bg-slate-900"
+            style={{ left: groupMenu.x, top: groupMenu.y }}>
+            <button autoFocus type="button" className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-indigo-50 dark:hover:bg-slate-800" onClick={() => {
+              if (groupMenu.kind === 'product') {
+                setCreationTarget({ productId: groupMenu.item.id, projectId: groupMenu.item.product_line_id });
+                setNewTaskDefaultStatus('backlog');
+                setNewTaskModalOpen(true);
+              } else {
+                setCreationTarget({ projectId: groupMenu.item.id });
+                setCreateHierarchyModalOpen(true);
+              }
+            }}>{groupMenu.kind === 'product' ? 'Add task' : 'Add product'}</button>
+            <button type="button" className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-indigo-50 dark:hover:bg-slate-800" onClick={() => {
+              const item = groupMenu.item;
+              const draft = { id: item.id, name: item.name, description: item.description || '' };
+              if (groupMenu.kind === 'product') setEditingProduct({ ...draft, assignee_ids: item.assignee_ids || [] });
+              else setEditingProject(draft);
+            }}>{groupMenu.kind === 'product' ? 'Edit product' : 'Edit project'}</button>
+          </div>
+        </div>}
         {editingProject && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-label="Edit project">
           <form onSubmit={(event) => {
             event.preventDefault();
@@ -2808,6 +2844,7 @@ export default function App({ account, onSignOut }) {
         {/* ==================================================================== */}
         {createHierarchyModalOpen && currentUser.role === 'manager' && (
           <CreateProjectProductModal
+            initialProjectId={creationTarget?.projectId}
             productLines={productLines.filter(project => !project.archived)}
             onClose={() => setCreateHierarchyModalOpen(false)}
             onCreateProject={(projectName, initialProductName) => {
@@ -2856,6 +2893,8 @@ export default function App({ account, onSignOut }) {
         {/* ==================================================================== */}
         {newTaskModalOpen && currentUser.role === 'manager' && (
           <NewTaskModal
+            initialProjectId={creationTarget?.projectId}
+            initialProductId={creationTarget?.productId}
             productLines={productLines.filter(project => !project.archived)}
             projects={projects.filter(product => !productLineMap[product.product_line_id]?.archived)}
             tasks={tasks}
@@ -2864,7 +2903,7 @@ export default function App({ account, onSignOut }) {
             defaultStatus={newTaskDefaultStatus}
             onClose={() => setNewTaskModalOpen(false)}
             onCreate={(newTask) => {
-              setTasks((prev) => [newTask, ...prev]);
+              appendTask(newTask);
               setNewTaskModalOpen(false);
               pushToast('success', 'Task Created', `"${newTask.title}" added.`);
             }}
@@ -3021,8 +3060,7 @@ function GanttView({
   onCollapseAll,
   collapseLabel,
   onSelectTask,
-  onEditProject,
-  onEditProduct,
+  onGroupMenu,
   onUpdateTask,
   onRequestSplitTask,
   pushToast,
@@ -3154,7 +3192,51 @@ function GanttView({
   const [compactTimeline, setCompactTimeline] = useState(() => window.matchMedia('(max-width: 767px)').matches);
   const [timelineOptionsOpen, setTimelineOptionsOpen] = useState(false);
   useEffect(() => {const query=window.matchMedia('(max-width: 767px)');const update=()=>setCompactTimeline(query.matches);query.addEventListener('change',update);return()=>query.removeEventListener('change',update);},[]);
-  const leftColWidth = compactTimeline ? 158 : 370;
+  const [columnWidth, setColumnWidth] = useState(() => {
+    const saved = Number(localStorage.getItem('gantt-column-width'));
+    return saved >= 220 && saved <= 640 ? saved : 370;
+  });
+  const [columnLocked, setColumnLocked] = useState(() => localStorage.getItem('gantt-column-locked') === 'true');
+  useEffect(() => {
+    localStorage.setItem('gantt-column-width', String(columnWidth));
+    localStorage.setItem('gantt-column-locked', String(columnLocked));
+  }, [columnWidth, columnLocked]);
+  const [panelHeight, setPanelHeight] = useState(null);
+  const panelRef = useRef(null);
+  const resizeStart = useRef(null);
+  const leftColWidth = compactTimeline ? 158 : Math.min(columnWidth, Math.max(220, (viewportWidth || 740) - 220));
+  const resizeHandle = (axis) => {
+    const horizontal = axis === 'column';
+    const value = horizontal ? leftColWidth : panelRef.current?.offsetHeight || 320;
+    const setSize = (size) => {
+      if (horizontal) setColumnWidth(Math.max(220, Math.min(640, size)));
+      else setPanelHeight(Math.max(200, size));
+    };
+    return {
+      role: 'separator',
+      tabIndex: 0,
+      'aria-label': horizontal ? 'Resize task column' : 'Resize Gantt panel height',
+      'aria-orientation': horizontal ? 'vertical' : 'horizontal',
+      onPointerDown(event) {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        resizeStart.current = { coordinate: horizontal ? event.clientX : event.clientY, value };
+      },
+      onPointerMove(event) {
+        if (!resizeStart.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+        setSize(resizeStart.current.value + (horizontal ? event.clientX : event.clientY) - resizeStart.current.coordinate);
+      },
+      onLostPointerCapture() { resizeStart.current = null; },
+      onKeyDown(event) {
+        const delta = event.key === (horizontal ? 'ArrowRight' : 'ArrowDown') ? 16
+          : event.key === (horizontal ? 'ArrowLeft' : 'ArrowUp') ? -16 : 0;
+        if (!delta) return;
+        event.preventDefault();
+        setSize(value + delta);
+      },
+    };
+  };
 
   const daysArray = useMemo(() => {
     const arr = [];
@@ -3657,6 +3739,8 @@ function GanttView({
       {/* Timeline */}
       {/* Main Gantt Card with Alt+Wheel Zoom, Clipped Timeline Column (No Overlap!), & Native Scroll */}
       <div
+        ref={panelRef}
+        style={panelHeight == null || compactTimeline ? undefined : { flex: `0 1 ${panelHeight}px` }}
         className="bg-white dark:bg-slate-900 rounded-2xl border border-stone-200 dark:border-slate-800 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col"
       >
         <div
@@ -3685,6 +3769,14 @@ function GanttView({
                 <span className="hidden md:inline text-[10px] normal-case tracking-normal font-medium text-slate-500 dark:text-slate-400 max-w-[230px] text-right">
                   Dashed: actual duration · Striped: blocked time
                 </span>
+              {!compactTimeline && <button type="button" aria-pressed={columnLocked}
+                  title={columnLocked ? 'Unlock task column width' : 'Lock task column width'}
+                  onClick={() => setColumnLocked(previous => !previous)}
+                  className="ml-1 shrink-0 rounded px-1 text-[10px] normal-case text-indigo-600 dark:text-indigo-300">
+                  {columnLocked ? 'Unlock width' : 'Lock width'}
+                </button>}
+                {!compactTimeline && !columnLocked && <span {...resizeHandle('column')}
+                  title="Drag to resize the task column" className="absolute inset-y-0 right-0 z-10 w-2 cursor-col-resize touch-none border-r-2 border-indigo-300 hover:bg-indigo-400 focus:bg-indigo-400" />}
               </div>
               <div className="flex flex-col relative">
                 <div className="flex h-5">
@@ -3912,8 +4004,8 @@ function GanttView({
                       <div
                         style={{ height: `${groupRowHeight}px` }}
                         onClick={() => toggleGroup(plKey)}
-                        onContextMenu={(event) => { if (onEditProject) { event.preventDefault(); onEditProject(pl); } }}
-                        title={onEditProject ? `${pl.description ? `${pl.description} - ` : ''}Right-click to edit project` : pl.description || undefined}
+                        onContextMenu={(event) => onGroupMenu?.(event, 'project', pl)}
+                        title={onGroupMenu ? 'Right-click for project actions' : pl.description || undefined}
                         className="flex items-center bg-stone-100/90 dark:bg-slate-800/80 cursor-pointer hover:bg-stone-200/60 dark:hover:bg-slate-800 transition-colors"
                       >
                         <div
@@ -3946,8 +4038,8 @@ function GanttView({
                               <div
                                 style={{ height: `${groupRowHeight}px` }}
                                 onClick={() => toggleGroup(projKey)}
-                                onContextMenu={(event) => { if (onEditProduct) { event.preventDefault(); onEditProduct(proj); } }}
-                                title={onEditProduct ? 'Right-click to edit product' : proj.description || undefined}
+                                onContextMenu={(event) => onGroupMenu?.(event, 'product', proj)}
+                                title={onGroupMenu ? 'Right-click for product actions' : proj.description || undefined}
                                 className="flex items-center bg-stone-50/90 dark:bg-slate-900/90 cursor-pointer hover:bg-stone-100 dark:hover:bg-slate-800/50"
                               >
                                 <div
@@ -4315,6 +4407,8 @@ function GanttView({
             <div style={{ width: `${totalDays * dayWidth}px`, height: '1px' }} />
           </div>
         </div>
+        {!compactTimeline && <div {...resizeHandle('panel')} title="Drag to resize the Gantt panel"
+          className="h-2 shrink-0 cursor-row-resize touch-none border-t bg-stone-100 hover:bg-indigo-300 focus:bg-indigo-300 dark:bg-slate-800" />}
       </div>
     </div>
   );
@@ -4463,6 +4557,14 @@ function TaskSidePanel({
             <span className="text-xs font-semibold text-slate-500">Task {itemNumber(task.id)}</span>
             <TaskDraftField key={`${task.id}:title`} taskId={task.id} field="title" value={task.title} onCommit={onUpdateTask} disabled={!canEdit}
               className="w-full font-bold text-lg text-slate-900 dark:text-white bg-transparent border-b border-transparent focus:border-indigo-500 focus:outline-none disabled:opacity-70" />
+
+            <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Task description
+            </label>
+            <TaskDraftField key={`${task.id}:details`} taskId={task.id} field="details" value={task.details || ''} onCommit={onUpdateTask} disabled={!canEdit} multiline rows={3}
+              className="w-full rounded-xl bg-stone-50 dark:bg-slate-800/80 border border-stone-200 dark:border-slate-800 p-3 text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60" />
+          </div>
 
             {!canEdit && (
               <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
@@ -4832,15 +4934,6 @@ function TaskSidePanel({
                   className="w-full px-2.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 font-medium" />
               </div>
             )}
-          </div>
-
-          {/* 3. Details */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Engineering Specification & Notes
-            </label>
-            <TaskDraftField key={`${task.id}:details`} taskId={task.id} field="details" value={task.details || ''} onCommit={onUpdateTask} disabled={!canEdit} multiline rows={3}
-              className="w-full rounded-xl bg-stone-50 dark:bg-slate-800/80 border border-stone-200 dark:border-slate-800 p-3 text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60" />
           </div>
 
           {/* 4. Threaded Comments */}
@@ -5626,9 +5719,9 @@ function SettingsView({
 // ============================================================================
 // CREATE PROJECT / PRODUCT MODAL
 // ============================================================================
-function CreateProjectProductModal({ productLines, onClose, onCreateProject, onCreateProduct }) {
+function CreateProjectProductModal({ initialProjectId, productLines, onClose, onCreateProject, onCreateProduct }) {
   const [mode, setMode] = useState('product');
-  const [selectedPlId, setSelectedPlId] = useState(productLines[1]?.id || productLines[0]?.id || '');
+  const [selectedPlId, setSelectedPlId] = useState(initialProjectId || productLines[1]?.id || productLines[0]?.id || '');
   const [projectName, setProjectName] = useState('');
   const [productName, setProductName] = useState('');
   const [defaultPriority, setDefaultPriority] = useState(2);
@@ -5750,10 +5843,10 @@ function CreateProjectProductModal({ productLines, onClose, onCreateProject, onC
 // ============================================================================
 // NEW TASK MODAL
 // ============================================================================
-function NewTaskModal({ productLines, projects, tasks, users, currentUser, defaultStatus, onClose, onCreate }) {
-  const [selectedPlId, setSelectedPlId] = useState(productLines[0]?.id || '');
+function NewTaskModal({ initialProjectId, initialProductId, productLines, projects, tasks, users, currentUser, defaultStatus, onClose, onCreate }) {
+  const [selectedPlId, setSelectedPlId] = useState(initialProjectId || productLines[0]?.id || '');
   const availableProducts = projects.filter((p) => !p.archived && p.product_line_id === selectedPlId);
-  const [projectId, setProjectId] = useState(availableProducts[0]?.id || projects[0]?.id || '');
+  const [projectId, setProjectId] = useState(initialProductId || availableProducts[0]?.id || projects[0]?.id || '');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
