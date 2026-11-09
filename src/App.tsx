@@ -3293,6 +3293,30 @@ function GanttView({
     return mapByDay;
   }, [allTasks, daysArray]);
 
+  const groupEndDates = useMemo(() => {
+    const productParents = new Map(projects.filter(product => !product.archived)
+      .map(product => [product.id, product.product_line_id]));
+    const productEnds = new Map();
+    const projectEnds = new Map();
+    for (const task of allTasks) {
+      const parent = productParents.get(task.project_id);
+      const end = getPlannedEndDate(task);
+      if (!parent || !end) continue;
+      if (end > (productEnds.get(task.project_id) || '')) productEnds.set(task.project_id, end);
+      if (end > (projectEnds.get(parent) || '')) projectEnds.set(parent, end);
+    }
+    return { productEnds, projectEnds };
+  }, [allTasks, projects]);
+
+  const renderGroupEnd = (date, count) => (
+    <div className="ml-1 flex shrink-0 items-center gap-2 whitespace-nowrap text-[10px]">
+      <strong className="font-semibold text-slate-600 dark:text-slate-300" title={date ? `Planned end: ${date}` : 'No planned end date'}>
+        {date ? `End ${date}` : 'No end date'}
+      </strong>
+      <small className="hidden text-slate-500 dark:text-slate-400 md:inline">{count} {count === 1 ? 'task' : 'tasks'}</small>
+    </div>
+  );
+
   // Keep undated tasks in the hierarchy so they can be scheduled from Gantt.
   const groupedHierarchy = useMemo(() => {
 
@@ -3896,19 +3920,17 @@ function GanttView({
                           style={{ width: `${leftColWidth}px`, height: `${groupRowHeight}px` }}
                           className="gantt-group-label sticky left-0 z-30 bg-stone-100 dark:bg-slate-800 px-4 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
                         >
-                          <div className="flex items-center gap-2 font-bold text-sm text-indigo-950 dark:text-indigo-200">
+                          <div className="flex min-w-0 items-center gap-2 font-bold text-sm text-indigo-950 dark:text-indigo-200">
                             {plCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                             <span className="px-1.5 py-0.5 text-[10px] rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 uppercase">
                               Project
                             </span>
-                            <span>{pl.name} <small>{itemNumber(pl.id)}</small></span>
+                            <span className="truncate">{pl.name} <small>{itemNumber(pl.id)}</small></span>
                           </div>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold">
-                            {pl.totalTasks} tasks
-                          </span>
+                          {renderGroupEnd(groupEndDates.projectEnds.get(pl.id), pl.totalTasks)}
                         </div>
                         <div className="relative h-full shrink-0" style={{ width: totalDays * dayWidth }}>
-                          {plCollapsed && renderGroupSchedule(pl.projects.flatMap(product => product.tasks))}
+                          {renderGroupSchedule(pl.projects.flatMap(product => product.tasks))}
                         </div>
                       </div>
 
@@ -3943,10 +3965,10 @@ function GanttView({
                                     </span>
                                     <span className="truncate">{proj.name} <small>{itemNumber(proj.id)}</small></span>
                                   </div>
-                                  <span className="text-[11px] text-slate-400">{proj.tasks.length} tasks</span>
+                                  {renderGroupEnd(groupEndDates.productEnds.get(proj.id), proj.tasks.length)}
                                 </div>
                                 <div className="relative h-full shrink-0" style={{ width: totalDays * dayWidth }}>
-                                  {projCollapsed && renderGroupSchedule(proj.tasks)}
+                                  {renderGroupSchedule(proj.tasks)}
                                 </div>
                               </div>
 
@@ -5733,6 +5755,7 @@ function NewTaskModal({ productLines, projects, tasks, users, currentUser, defau
   const availableProducts = projects.filter((p) => !p.archived && p.product_line_id === selectedPlId);
   const [projectId, setProjectId] = useState(availableProducts[0]?.id || projects[0]?.id || '');
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
   const [priority, setPriority] = useState(2);
   const [criticality, setCriticality] = useState('high');
@@ -5773,6 +5796,12 @@ function NewTaskModal({ productLines, projects, tasks, users, currentUser, defau
               className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-slate-800 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
+
+          <label className="block font-semibold text-slate-500">
+            Task description (optional)
+            <textarea rows={3} value={description} onChange={event => setDescription(event.target.value)}
+              className="mt-1 w-full rounded-xl bg-stone-100 px-3 py-2 text-sm text-slate-900 dark:bg-slate-800 dark:text-slate-100" />
+          </label>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -5946,7 +5975,7 @@ function NewTaskModal({ productLines, projects, tasks, users, currentUser, defau
                 id: `task-${Date.now()}`,
                 project_id: projectId,
                 title: title.trim(),
-                details: '',
+                details: description.trim(),
                 assignee_id: (projects.find(product => product.id === projectId)?.assignee_ids?.length === 1 ? projects.find(product => product.id === projectId).assignee_ids[0] : assigneeId) || null,
                 priority,
                 criticality,
