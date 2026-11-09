@@ -2916,7 +2916,8 @@ export default function App({ account, onSignOut }) {
               </div>
               <div className="space-y-2 text-xs">
                 {[
-                  { key: 'Alt + Wheel', desc: 'Zoom Gantt timeline in / out smoothly' },
+                  { key: 'Alt + Wheel', desc: 'Zoom the Gantt timeline horizontally' },
+                  { key: 'Alt + Shift + Wheel', desc: 'Zoom Gantt rows vertically' },
                   { key: '+ / -', desc: 'Zoom Gantt timeline in / out via keyboard' },
                   { key: 'N', desc: 'Open New Task dialog' },
                   { key: 'P', desc: 'Open Create Project / Product dialog' },
@@ -3031,14 +3032,22 @@ function GanttView({
   const ganttScrollRef = useRef(null);
   const timelineScrollbarRef = useRef(null);
   const [viewportWidth, setViewportWidth] = useState(0);
+  const [rowZoom, setRowZoom] = useState(1);
   useEffect(() => {
     const element = ganttScrollRef.current;
     if (!element) return;
 
     const handleWheel = (event) => {
       if (!event.altKey && !event.ctrlKey && !event.metaKey) return;
+      const vertical = event.altKey && event.shiftKey;
+      const wheel = event.deltaY || (vertical ? event.deltaX : 0);
+      if (!wheel) return;
       event.preventDefault();
-      const delta = event.deltaY < 0 ? 0.14 : -0.14;
+      if (vertical) {
+        setRowZoom(scale => Math.max(0.7, Math.min(2, Number((scale + (wheel < 0 ? 0.1 : -0.1)).toFixed(2)))));
+        return;
+      }
+      const delta = wheel < 0 ? 0.14 : -0.14;
       setZoomScale((scale) => Math.max(0.6, Math.min(2.2, Number((scale + delta).toFixed(2)))));
     };
 
@@ -3096,11 +3105,11 @@ function GanttView({
     });
     return counts;
   }, [allTasks, taskMap]);
-  const rowHeight = 68;
+  const rowHeight = Math.round(68 * rowZoom);
   const draggedTask = useRef(null);
   const [bulkStatus, setBulkStatus] = useState('done');
   const [bulkReason, setBulkReason] = useState('');
-  const groupRowHeight = 32;
+  const groupRowHeight = Math.round(32 * rowZoom);
   const [compactTimeline, setCompactTimeline] = useState(() => window.matchMedia('(max-width: 767px)').matches);
   const [timelineOptionsOpen, setTimelineOptionsOpen] = useState(false);
   useEffect(() => {const query=window.matchMedia('(max-width: 767px)');const update=()=>setCompactTimeline(query.matches);query.addEventListener('change',update);return()=>query.removeEventListener('change',update);},[]);
@@ -3369,7 +3378,7 @@ function GanttView({
       });
     });
     return wires;
-  }, [visibleTaskRows, showDependencyArrows, dayWidth, timelineStart, dragState, taskMap]);
+  }, [visibleTaskRows, showDependencyArrows, dayWidth, timelineStart, dragState, taskMap, rowHeight, groupRowHeight]);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
@@ -3496,6 +3505,7 @@ function GanttView({
             </select>
           </div>
 
+          <span className="text-[10px] text-slate-500" title="Hold Alt + Shift and scroll over the Gantt">Rows {Math.round(rowZoom * 100)}% (Alt+Shift+Wheel)</span>
           {/* Zoom Slider + Alt+Wheel Indicator */}
           <div className="flex items-center gap-1.5 bg-stone-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
             <button
@@ -3906,9 +3916,9 @@ function GanttView({
                                           <div className="text-xs text-slate-800 dark:text-slate-100 font-bold leading-snug line-clamp-2">
                                             {task.title} <small className="text-slate-500">{itemNumber(task.id)}</small>
                                           </div>
-                                          <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight line-clamp-2">
+                                          {rowZoom >= 1 && <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight line-clamp-2">
                                             {task.details || 'No additional engineering details.'}
-                                          </div>
+                                          </div>}
                                           <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
                                             <span className="font-semibold text-indigo-600 dark:text-indigo-400">
                                               {Number(task.planned_days) > 0 ? `Plan: ${task.planned_days}d` : 'Duration not set'}
@@ -3988,9 +3998,10 @@ function GanttView({
                                             style={{
                                               left: `${leftPx}px`,
                                               width: `${Math.max(24, actualWidthPx)}px`,
+                                              height: rowHeight - 10,
                                             }}
                                             title={`Actual Time Taken: ${task.actual_days}d (Planned: ${task.planned_days}d)`}
-                                            className={`absolute top-1.5 h-20 rounded-xl border-2 border-dashed pointer-events-none z-10 flex items-end justify-end px-2 pb-1 ${
+                                            className={`absolute top-1.5 rounded-xl border-2 border-dashed pointer-events-none z-10 flex items-end justify-end px-2 pb-1 ${
                                               Number(task.actual_days) > Number(task.planned_days)
                                                 ? 'border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-300'
                                                 : 'border-emerald-600 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200'
@@ -4007,6 +4018,8 @@ function GanttView({
                                           style={{
                                             left: `${leftPx}px`,
                                             width: `${widthPx}px`,
+                                            top: 8,
+                                            height: rowHeight - 16,
                                             ...getWeightBarStyle(task.status, task.weight ?? 5),
                                           }}
                                           onMouseDown={(e) => {
@@ -4052,7 +4065,7 @@ function GanttView({
                                           title={`#${itemNumber(task.id)} ${task.title}\nDetails: ${task.details || ''}\nWeight: ${task.weight ?? 5}/10 | Planned: ${task.planned_days ?? 1}d | Actual: ${task.actual_days ?? 0}d${
                                             blockedDaysNum > 0 ? ` | Blocked: ${blockedDaysNum}d` : ''
                                           }\nStart: ${startIso} → Planned end: ${plannedEnd}${blockedWidthPx > 0 ? `\nBlocked through: ${endIso}` : ''}`}
-                                          className={`absolute top-2.5 h-[52px] rounded-xl text-white flex flex-col justify-between px-3 py-1.5 cursor-grab active:cursor-grabbing overflow-hidden ${
+                                          className={`absolute rounded-xl text-white flex flex-col justify-between px-3 py-1.5 cursor-grab active:cursor-grabbing overflow-hidden ${
                                             isDraggingThis ? 'z-30 ring-2 ring-indigo-300 shadow-xl' : 'z-15 hover:brightness-105'
                                           } ${overdue ? 'ring-2 ring-rose-500 ring-offset-1 dark:ring-offset-slate-900' : ''} ${
                                             linkingFromTaskId && linkingFromTaskId !== task.id
@@ -4155,9 +4168,9 @@ function GanttView({
                                           </div>
 
                                           {/* Bottom 2-Line Details Area inside the Doubled-Height Gantt Bar */}
-                                          <div className="text-[10px] leading-tight text-white/95 line-clamp-2 relative z-10 pr-2 font-medium">
+                                          {rowZoom >= 0.9 && <div className="text-[10px] leading-tight text-white/95 line-clamp-2 relative z-10 pr-2 font-medium">
                                             {task.details || task.title}
-                                          </div>
+                                          </div>}
 
                                           <div
                                             onMouseDown={(e) => {
