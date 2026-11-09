@@ -3371,6 +3371,29 @@ function GanttView({
     return { leftPx, widthPx, startIso, plannedEnd, endIso, blockedWidthPx };
   };
 
+  const renderGroupSchedule = (groupTasks) => {
+    const changes = new Int32Array(totalDays + 1);
+    for (const task of groupTasks) {
+      if (!task.start_date || !task.due_date) continue;
+      const start = Math.max(0, diffCalendarDays(timelineStart, task.start_date));
+      const end = Math.min(totalDays - 1, diffCalendarDays(timelineStart, getPlannedEndDate(task)));
+      if (start > end) continue;
+      changes[start]++;
+      changes[end + 1]--;
+    }
+
+    let count = 0;
+    return daysArray.map((day, index) => {
+      count += changes[index];
+      if (!count) return null;
+      const label = `${day.iso}: ${count} scheduled ${count === 1 ? 'task' : 'tasks'}`;
+      return <span key={day.iso} title={label}
+        className="absolute top-1/2 h-2 -translate-y-1/2 border-r border-white/40 bg-indigo-500 dark:bg-indigo-400"
+        style={{ left: index * dayWidth, width: dayWidth, opacity: Math.min(0.85, 0.45 + count * 0.1) }}
+      />;
+    });
+  };
+
   const todayOffsetDays = diffCalendarDays(timelineStart, TODAY_CAIRO);
   const todayLeftPx = todayOffsetDays * dayWidth + dayWidth / 2;
 
@@ -3741,8 +3764,9 @@ function GanttView({
                         : `${d.iso} — ${memberLabel}: 0/10`;
                   }
 
-                  const overloaded = load > DAILY_PERSON_MAX_WEIGHT;
-                  const nearCap = load >= 8 && load <= DAILY_PERSON_MAX_WEIGHT;
+                  const capacityLoad = overlayMemberId === 'all' ? dayCell?.maxLoad || 0 : load;
+                  const overloaded = capacityLoad > DAILY_PERSON_MAX_WEIGHT;
+                  const nearCap = capacityLoad >= 8 && capacityLoad <= DAILY_PERSON_MAX_WEIGHT;
 
                   return (
                     <div
@@ -3882,7 +3906,9 @@ function GanttView({
                             {pl.totalTasks} tasks
                           </span>
                         </div>
-                        <div className="flex-1 h-full" />
+                        <div className="relative h-full shrink-0" style={{ width: totalDays * dayWidth }}>
+                          {plCollapsed && renderGroupSchedule(pl.projects.flatMap(product => product.tasks))}
+                        </div>
                       </div>
 
                       {/* Product & Task Rows */}
@@ -3918,7 +3944,9 @@ function GanttView({
                                   </div>
                                   <span className="text-[11px] text-slate-400">{proj.tasks.length} tasks</span>
                                 </div>
-                                <div className="flex-1 h-full" />
+                                <div className="relative h-full shrink-0" style={{ width: totalDays * dayWidth }}>
+                                  {projCollapsed && renderGroupSchedule(proj.tasks)}
+                                </div>
                               </div>
 
                               {/* Task Timeline Rows */}
