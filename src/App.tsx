@@ -3048,6 +3048,29 @@ function GanttView({
   const [linkingFromTaskId, setLinkingFromTaskId] = useState(null);
 
   const ganttScrollRef = useRef(null);
+  const gridPan = useRef(null);
+  const startGridPan = (event) => {
+    const scroll = ganttScrollRef.current;
+    if (!scroll || event.pointerType !== 'mouse' || event.button !== 0 || event.target !== event.currentTarget) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    gridPan.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      left: scroll.scrollLeft,
+      top: scroll.scrollTop,
+    };
+  };
+  const moveGridPan = (event) => {
+    const pan = gridPan.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    event.currentTarget.scrollLeft = pan.left + pan.x - event.clientX;
+    event.currentTarget.scrollTop = pan.top + pan.y - event.clientY;
+  };
+  const stopGridPan = (event) => {
+    if (gridPan.current?.pointerId === event.pointerId) gridPan.current = null;
+  };
   const timelineScrollbarRef = useRef(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const [rowZoom, setRowZoom] = useState(1);
@@ -3590,6 +3613,10 @@ function GanttView({
       >
         <div
           ref={ganttScrollRef}
+          onPointerMove={moveGridPan}
+          onPointerUp={stopGridPan}
+          onPointerCancel={stopGridPan}
+          onLostPointerCapture={stopGridPan}
           onScroll={(event) => {
             if (timelineScrollbarRef.current && timelineScrollbarRef.current.scrollLeft !== event.currentTarget.scrollLeft)
               timelineScrollbarRef.current.scrollLeft = event.currentTarget.scrollLeft;
@@ -3997,7 +4024,8 @@ function GanttView({
                                       {/* Right Timeline Track */}
                                       <div
                                         style={{ width: `${totalDays * dayWidth}px`, height: `${rowHeight}px` }}
-                                        className="relative overflow-hidden z-10 shrink-0"
+                                        onPointerDown={startGridPan}
+                                        className="relative overflow-hidden z-10 shrink-0 cursor-grab active:cursor-grabbing"
                                       >
                                         <div className="absolute inset-0 flex pointer-events-none">
                                           {daysArray.map((d) => (
