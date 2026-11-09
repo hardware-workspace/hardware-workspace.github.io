@@ -3743,7 +3743,7 @@ function GanttView({
             </div>
 
             {/* GANTT BODY ROWS */}
-            <div className="relative divide-y divide-[#f0f0ef] dark:divide-[#222e42]">
+            <div className="relative divide-y divide-[#e8e8e7] dark:divide-[#2c3a54]">
               {/* Vertical Red Dashed Today Line (Offset inside timeline track) */}
               {todayOffsetDays >= 0 && todayOffsetDays <= totalDays && (
                 <div
@@ -4004,8 +4004,8 @@ function GanttView({
                                             <div
                                               key={d.iso}
                                               style={{ width: `${dayWidth}px` }}
-                                              className={`shrink-0 border-r border-[#f0f0ef] dark:border-slate-800/[0.58] ${
-                                                d.isWeekend ? 'bg-stone-200/[0.65] dark:bg-slate-950/[0.79]' : ''
+                                              className={`shrink-0 border-r border-[#e8e8e7] dark:border-slate-800/[0.87] ${
+                                                d.isWeekend ? 'bg-stone-300/[0.62] dark:bg-black/[0.80]' : ''
                                               }`}
                                             />
                                           ))}
