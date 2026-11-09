@@ -38,7 +38,6 @@ import {
   ArrowUpDown,
   Mail,
   Activity,
-  Database,
   Layers,
   Eye,
   EyeOff,
@@ -1183,7 +1182,7 @@ export default function App({ account, onSignOut }) {
       if (myTasksOnly && t.assignee_id !== currentUser.id) return false;
       if (overdueOnly && !isTaskOverdue(t)) return false;
 
-      if (selectedAssignees.length > 0) {
+      if (!myTasksOnly && selectedAssignees.length > 0) {
         if (selectedAssignees.includes('unassigned')) {
           if (t.assignee_id !== null) return false;
         } else if (!selectedAssignees.includes(t.assignee_id)) {
@@ -2110,11 +2109,17 @@ export default function App({ account, onSignOut }) {
 
                 {/* Assignee Filter */}
                 <select
-                  value={selectedAssignees[0] || ''}
-                  onChange={(e) => setSelectedAssignees(e.target.value ? [e.target.value] : [])}
+                  aria-label="Filter by assignee"
+                  value={myTasksOnly ? 'my-tasks' : selectedAssignees[0] || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setMyTasksOnly(value === 'my-tasks');
+                    setSelectedAssignees(value && value !== 'my-tasks' ? [value] : []);
+                  }}
                   className="px-2 py-1 rounded-lg bg-stone-100 dark:bg-slate-800 text-xs font-medium"
                 >
                   <option value="">All Assignees</option>
+                  <option value="my-tasks">My Tasks</option>
                   <option value="unassigned">Unassigned</option>
                   {users
                     .filter((u) => u.is_active)
@@ -3738,7 +3743,7 @@ function GanttView({
             </div>
 
             {/* GANTT BODY ROWS */}
-            <div className="relative divide-y divide-stone-100 dark:divide-slate-800/80">
+            <div className="relative divide-y divide-[#f3f3f2] dark:divide-slate-800/95">
               {/* Vertical Red Dashed Today Line (Offset inside timeline track) */}
               {todayOffsetDays >= 0 && todayOffsetDays <= totalDays && (
                 <div
@@ -3999,8 +4004,8 @@ function GanttView({
                                             <div
                                               key={d.iso}
                                               style={{ width: `${dayWidth}px` }}
-                                              className={`shrink-0 border-r border-stone-100 dark:border-slate-800/40 ${
-                                                d.isWeekend ? 'bg-stone-200/45 dark:bg-slate-950/55' : ''
+                                              className={`shrink-0 border-r border-[#f3f3f2] dark:border-slate-800/[0.48] ${
+                                                d.isWeekend ? 'bg-stone-200/[0.54] dark:bg-slate-950/[0.66]' : ''
                                               }`}
                                             />
                                           ))}
@@ -5299,7 +5304,6 @@ function SettingsView({
           { id: 'lines', label: '2. Projects & Products (Drag to Reorder)', icon: Layers },
           { id: 'users', label: '3. Users & Roles', icon: Users },
           { id: 'notifications', label: '4. Email delivery', icon: Mail },
-          { id: 'sql', label: '5. Supabase SQL & RLS Schema', icon: Database },
         ].map((t) => {
           const Icon = t.icon;
           return (
@@ -5536,33 +5540,6 @@ function SettingsView({
 
       {subTab === 'notifications' && (<p className="bg-white p-5 rounded-xl border text-sm text-slate-500">Use Email notifications above to choose updates for your assigned tasks. Emails are queued on the server; local sample records never send email.</p>)}
 
-      {subTab === 'sql' && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-stone-200 dark:border-slate-800 space-y-3">
-          <h3 className="font-bold text-base">Supabase Schema (Dependencies, Blocked Days, Planned/Actual Days, RLS)</h3>
-          <pre className="p-4 rounded-xl bg-slate-950 text-emerald-300 text-xs font-mono overflow-x-auto leading-relaxed">
-{`-- Tasks Table with Priority (1..4), Criticality, Weight (1..10), Planned/Actual/Blocked Days, and Dependency Link
-CREATE TABLE tasks (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id uuid REFERENCES projects(id) ON DELETE CASCADE,
-  title text NOT NULL,
-  details text,
-  assignee_id uuid REFERENCES users(id),
-  priority smallint CHECK (priority BETWEEN 1 AND 4),
-  criticality text DEFAULT 'medium' CHECK (criticality IN ('critical','high','medium','low')),
-  weight smallint DEFAULT 5 CHECK (weight BETWEEN 1 AND 10),
-  start_date date,
-  due_date date,
-  planned_days numeric DEFAULT 1,
-  actual_days numeric DEFAULT 0,
-  blocked_days numeric DEFAULT 0,
-  depends_on_id uuid REFERENCES tasks(id) ON DELETE SET NULL,
-  status text NOT NULL DEFAULT 'backlog' CHECK (status IN ('backlog','in_progress','blocked','done')),
-  blocked_reason text CHECK (status != 'blocked' OR length(trim(blocked_reason)) > 0),
-  updated_at timestamptz DEFAULT now()
-);`}
-          </pre>
-        </div>
-      )}
     </div>
   );
 }
