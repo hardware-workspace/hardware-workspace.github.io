@@ -3024,6 +3024,19 @@ function GanttView({
 }) {
   const [overlayMemberId, setOverlayMemberId] = useState('all');
   const [periodPreset, setPeriodPreset] = useState('month'); // 'week' | 'month' | 'quarter' | 'year' | 'custom'
+  const currentYear = Number(TODAY_CAIRO.slice(0, 4));
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const yearOptions = useMemo(() => {
+    const years = new Set(Array.from({ length: 11 }, (_, index) => currentYear - 5 + index));
+    for (const task of allTasks) {
+      for (const date of [task.start_date, task.due_date]) {
+        const year = Number(date?.slice(0, 4));
+        if (Number.isInteger(year) && year >= 1000 && year <= 9999) years.add(year);
+      }
+    }
+    years.add(selectedYear);
+    return [...years].sort((a, b) => a - b);
+  }, [allTasks, currentYear, selectedYear]);
   const [customStart, setCustomStart] = useState(TODAY_CAIRO.slice(0, 7) + '-01');
   const [customEnd, setCustomEnd] = useState(addCalendarDays(TODAY_CAIRO, 30));
   const [showDependencyArrows, setShowDependencyArrows] = useState(true);
@@ -3086,14 +3099,14 @@ function GanttView({
       start = iso(new Date(Date.UTC(year, quarterStart, 1)));
       end = iso(new Date(Date.UTC(year, quarterStart + 3, 0)));
     } else if (periodPreset === 'year') {
-      start = `${year}-01-01`;
-      end = `${year}-12-31`;
+      start = `${selectedYear}-01-01`;
+      end = `${selectedYear}-12-31`;
     } else {
       start = customStart || TODAY_CAIRO;
       end = customEnd && customEnd > start ? customEnd : addCalendarDays(start, 30);
     }
     return { timelineStart: start, totalDays: Math.max(7, Math.min(366, diffCalendarDays(start, end) + 1)) };
-  }, [periodPreset, customStart, customEnd]);
+  }, [periodPreset, customStart, customEnd, selectedYear]);
 
   // Base cell width multiplied by zoomScale (Enlarged cells & Doubled Task Card Height!)
   const baseWidth = zoom === 'day' ? 50 : zoom === 'week' ? 34 : 18;
@@ -3159,7 +3172,7 @@ function GanttView({
   };
 
   useEffect(() => {
-    scrollToDate(periodPreset === 'custom' ? customStart : TODAY_CAIRO);
+    scrollToDate(periodPreset === 'custom' || (periodPreset === 'year' && selectedYear !== currentYear) ? timelineStart : TODAY_CAIRO);
   }, [periodPreset, timelineStart]);
 
   // Mouse move / up listener for dragging or resizing Gantt bars
@@ -3417,7 +3430,10 @@ function GanttView({
 
 
           <button
-            onClick={() => scrollToDate(TODAY_CAIRO)}
+            onClick={() => {
+              if (periodPreset === 'year' && selectedYear !== currentYear) setSelectedYear(currentYear);
+              else scrollToDate(TODAY_CAIRO);
+            }}
             className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-semibold border border-rose-200 dark:border-rose-800 hover:bg-rose-100"
           >
             Jump to Today
@@ -3431,7 +3447,7 @@ function GanttView({
               { id: 'week', label: 'By Week' },
               { id: 'month', label: 'By Month' },
               { id: 'quarter', label: 'By Quarter' },
-              { id: 'year', label: `By Year (${TODAY_CAIRO.slice(0, 4)})` },
+              { id: 'year', label: periodPreset === 'year' ? 'By Year' : `By Year (${selectedYear})` },
               { id: 'custom', label: 'Custom' },
             ].map((p) => (
               <button
@@ -3446,6 +3462,12 @@ function GanttView({
                 {p.label}
               </button>
             ))}
+            {periodPreset === 'year' && (
+              <select aria-label="Gantt year" value={selectedYear} onChange={event => setSelectedYear(Number(event.target.value))}
+                className="bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded text-[11px] border border-stone-300 dark:border-slate-700">
+                {yearOptions.map(year => <option key={year} value={year}>{year}</option>)}
+              </select>
+            )}
             {periodPreset === 'custom' && (
               <div className="flex items-center gap-1 ml-1">
                 <input
