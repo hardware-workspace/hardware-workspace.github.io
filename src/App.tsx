@@ -3325,8 +3325,8 @@ function GanttView({
     const endIso = getBlockedEndDate(task, plannedEnd);
     const leftPx = diffCalendarDays(timelineStart, startIso) * dayWidth;
     const span = Math.max(1, diffCalendarDays(startIso, endIso) + 1);
-    const widthPx = Math.max(dayWidth * 0.85, span * dayWidth - 4);
-    const blockedWidthPx = Math.max(0, diffCalendarDays(plannedEnd, endIso) * dayWidth - 4);
+    const widthPx = span * dayWidth;
+    const blockedWidthPx = Math.max(0, diffCalendarDays(plannedEnd, endIso) * dayWidth);
     return { leftPx, widthPx, startIso, plannedEnd, endIso, blockedWidthPx };
   };
 
@@ -3892,7 +3892,7 @@ function GanttView({
                                   const actualSpanDays = actualEndIso
                                     ? Math.max(1, diffCalendarDays(task.start_date, actualEndIso) + 1)
                                     : 0;
-                                  const actualWidthPx = actualSpanDays * dayWidth - 4;
+                                  const actualWidthPx = actualSpanDays * dayWidth;
 
                                   const blockedDaysNum = Number(task.blocked_days) || 0;
 
@@ -3997,11 +3997,10 @@ function GanttView({
                                           <div
                                             style={{
                                               left: `${leftPx}px`,
-                                              width: `${Math.max(24, actualWidthPx)}px`,
-                                              height: rowHeight - 10,
+                                              width: `${actualWidthPx}px`,
                                             }}
                                             title={`Actual Time Taken: ${task.actual_days}d (Planned: ${task.planned_days}d)`}
-                                            className={`absolute top-1.5 rounded-xl border-2 border-dashed pointer-events-none z-10 flex items-end justify-end px-2 pb-1 ${
+                                            className={`absolute inset-y-0 border-2 border-dashed pointer-events-none z-20 flex items-end justify-end px-2 pb-1 ${
                                               Number(task.actual_days) > Number(task.planned_days)
                                                 ? 'border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-300'
                                                 : 'border-emerald-600 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200'
@@ -4013,13 +4012,11 @@ function GanttView({
                                           </div>
                                         )}
 
-                                        {/* DOUBLED-HEIGHT GANTT BAR (Shows 2-Line Title + 2-Line Details) */}
+                                        {/* Full-cell Gantt task bar */}
                                         {scheduled && <div
                                           style={{
                                             left: `${leftPx}px`,
                                             width: `${widthPx}px`,
-                                            top: 8,
-                                            height: rowHeight - 16,
                                             ...getWeightBarStyle(task.status, task.weight ?? 5),
                                           }}
                                           onMouseDown={(e) => {
@@ -4065,9 +4062,9 @@ function GanttView({
                                           title={`#${itemNumber(task.id)} ${task.title}\nDetails: ${task.details || ''}\nWeight: ${task.weight ?? 5}/10 | Planned: ${task.planned_days ?? 1}d | Actual: ${task.actual_days ?? 0}d${
                                             blockedDaysNum > 0 ? ` | Blocked: ${blockedDaysNum}d` : ''
                                           }\nStart: ${startIso} → Planned end: ${plannedEnd}${blockedWidthPx > 0 ? `\nBlocked through: ${endIso}` : ''}`}
-                                          className={`absolute rounded-xl text-white flex flex-col justify-between px-3 py-1.5 cursor-grab active:cursor-grabbing overflow-hidden ${
+                                          className={`absolute inset-y-0 text-white flex flex-col justify-between px-3 py-1.5 cursor-grab active:cursor-grabbing overflow-hidden ${
                                             isDraggingThis ? 'z-30 ring-2 ring-indigo-300 shadow-xl' : 'z-15 hover:brightness-105'
-                                          } ${overdue ? 'ring-2 ring-rose-500 ring-offset-1 dark:ring-offset-slate-900' : ''} ${
+                                          } ${overdue ? 'ring-2 ring-inset ring-rose-500' : ''} ${
                                             linkingFromTaskId && linkingFromTaskId !== task.id
                                               ? 'ring-2 ring-amber-400'
                                               : ''
