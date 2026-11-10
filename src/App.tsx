@@ -3627,17 +3627,122 @@ function GanttView({
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
       {!controlsVisible && onToggleGanttFocus && (
-        <div className="flex items-center shrink-0">
-          <button
-            type="button"
-            aria-pressed={ganttExpanded}
-            onClick={onToggleGanttFocus}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-colors"
-            title="Show Gantt controls and exit expanded view"
-          >
-            <Minimize2 className="h-3.5 w-3.5 text-indigo-600" aria-hidden="true" />
-            <span>Show Gantt controls</span>
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-1.5 shrink-0 bg-white dark:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-stone-200 dark:border-slate-800 shadow-xs text-xs">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              aria-pressed={ganttExpanded}
+              onClick={onToggleGanttFocus}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 px-2.5 py-1 font-semibold text-indigo-700 dark:text-indigo-300 transition-colors"
+              title="Show Gantt controls and exit expanded view"
+            >
+              <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Show Gantt controls</span>
+            </button>
+            <button
+              type="button"
+              onClick={onExpandAll}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-stone-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 text-slate-700 dark:text-slate-200 font-semibold transition-colors"
+              title="Shortcut: E"
+            >
+              <Maximize2 className="w-3.5 h-3.5 text-indigo-600" />
+              <span>{expandLabel}</span>
+            </button>
+            <button
+              type="button"
+              onClick={onCollapseAll}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-stone-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 text-slate-700 dark:text-slate-200 font-semibold transition-colors"
+              title="Shortcut: C"
+            >
+              <Minimize2 className="w-3.5 h-3.5 text-slate-500" />
+              <span>{collapseLabel}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (periodPreset === 'year' && selectedYear !== currentYear) setSelectedYear(currentYear);
+                else scrollToDate(TODAY_CAIRO);
+              }}
+              className="px-2 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-semibold border border-rose-200 dark:border-rose-800 hover:bg-rose-100"
+            >
+              Jump to Today
+            </button>
+            <div className="flex items-center gap-0.5 bg-stone-100 dark:bg-slate-800 p-0.5 rounded-lg border border-stone-200 dark:border-slate-700">
+              {[
+                { id: 'week', label: 'Week' },
+                { id: 'month', label: 'Month' },
+                { id: 'quarter', label: 'Quarter' },
+                { id: 'year', label: 'Year' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setPeriodPreset(p.id)}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-colors ${
+                    periodPreset === p.id
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <select
+              aria-label="Sort Gantt tasks"
+              value={taskSort}
+              onChange={(event) => setTaskSort(event.target.value)}
+              className="rounded-lg border border-stone-200 dark:border-slate-700 bg-stone-100 dark:bg-slate-800 px-2 py-1 text-[11px] font-semibold"
+            >
+              <option value="position">Sort: Manual</option>
+              <option value="due_date">Sort: Planned end</option>
+              <option value="completed_at">Sort: Completed</option>
+              <option value="start_date">Sort: Start date</option>
+              <option value="status">Sort: Status</option>
+              <option value="title">Sort: Task name</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowDependencyArrows((prev) => !prev)}
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg font-semibold border transition-colors ${
+                showDependencyArrows
+                  ? 'bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                  : 'bg-stone-100 dark:bg-slate-800 text-slate-500 border-transparent'
+              }`}
+              title="Toggle dependency wires"
+            >
+              <GitBranch className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Dependencies</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5 bg-stone-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setZoomScale((s) => Math.max(0.6, Number((s - 0.15).toFixed(2))))}
+              className="p-0.5 rounded hover:bg-stone-200 dark:hover:bg-slate-700"
+              title="Zoom Out (- or Alt+Wheel)"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <input
+              type="range"
+              min="0.6"
+              max="2.2"
+              step="0.05"
+              value={zoomScale}
+              onChange={(e) => setZoomScale(Number(e.target.value))}
+              className="w-16 accent-indigo-600 cursor-pointer"
+              title="Hold Alt + Mouse Wheel on the Gantt to zoom smoothly"
+            />
+            <button
+              type="button"
+              onClick={() => setZoomScale((s) => Math.min(2.2, Number((s + 0.15).toFixed(2))))}
+              className="p-0.5 rounded hover:bg-stone-200 dark:hover:bg-slate-700"
+              title="Zoom In (+ or Alt+Wheel)"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       )}
       {controlsVisible && <>
