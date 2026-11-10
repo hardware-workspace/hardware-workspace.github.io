@@ -2,7 +2,9 @@
 
 ## Request and result
 
-Latest request: added text labels (Total, Done, In Progress, Blocked, Backlog, Overdue) beside each number in the compact header count pill in `src/App.tsx`.
+Latest request: removed the "Rows 100% (Alt+Shift+Wheel)" hint from the Gantt controls bar (Alt+Shift+Wheel row zoom still works).
+
+Before that: added text labels (Total, Done, In Progress, Blocked, Backlog, Overdue) beside each number in the compact header count pill in `src/App.tsx`.
 
 Before that: added a compact single-row Gantt controls bar next to `Show Gantt controls` when the Gantt is in expanded / hidden-controls mode in `src/App.tsx` (Expand/Collapse All, Jump to Today, Week/Month/Quarter/Year period switch, Sort tasks, Dependencies toggle, and Zoom slider).
 

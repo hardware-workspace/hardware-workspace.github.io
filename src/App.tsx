@@ -3916,7 +3916,6 @@ function GanttView({
             </select>
           </div>
 
-          <span className="text-[10px] text-slate-500" title="Hold Alt + Shift and scroll over the Gantt">Rows {Math.round(rowZoom * 100)}% (Alt+Shift+Wheel)</span>
           {/* Zoom Slider + Alt+Wheel Indicator */}
           <div className="flex items-center gap-1.5 bg-stone-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
             <button
