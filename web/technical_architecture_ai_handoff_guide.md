@@ -1,5 +1,7 @@
 # Hardware Workspace — AI and engineer handoff
 
+> Historical architecture snapshot. For the current verified status, last session, and next task, read `AGENTS.md` and the short files in `.ai/`. Do not treat the task counts or pending-work notes below as live state.
+
 Updated 8 November 2026. Repository: https://github.com/hardware-workspace/hardware-workspace.github.io. Production: https://hardware-workspace.github.io/. Local workspace: `D:\_Projects\hardware tool`.
 
 ## Current production state

@@ -1,5 +1,7 @@
 # Communication Team Task Manager
 
+AI coding agents: start with [`AGENTS.md`](AGENTS.md), then the short files in [`.ai/`](.ai/CURRENT_STATE.md). See the agent access modes there for local, GitHub-only, and external-tool workflows. The existing application, GitHub repository, and Supabase project are shared across providers.
+
 React + Vite workspace for hardware engineering tasks, Gantt scheduling, products, and team capacity.
 
 ## Run locally
@@ -66,4 +68,4 @@ Checks refresh the local `origin/main` reference and rebuild `dist`, but do not 
 
 ## Current status
 
-Production uses a Supabase shared workspace. The latest user-provided JSON import contains 15 project groups, 25 products, and 177 tasks; all imported tasks lack schedule dates and are in backlog. The Gantt displays them as unscheduled rows and provides staged expansion plus a product filter. See `web/technical_architecture_ai_handoff_guide.md` for current state and `SECURITY_SETUP.md` for access design. Local demo access still uses bundled sample records.
+For the latest verified state and session handoff, read [`.ai/CURRENT_STATE.md`](.ai/CURRENT_STATE.md) and [`.ai/HANDOFF.md`](.ai/HANDOFF.md). The older [architecture handoff](web/technical_architecture_ai_handoff_guide.md) explains implementation details and historical database work; verify time-sensitive facts against current code and Git history. See `SECURITY_SETUP.md` for access design. Local demo access uses bundled sample records rather than production data.
