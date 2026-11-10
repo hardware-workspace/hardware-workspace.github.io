@@ -2,9 +2,9 @@
 
 ## Request and result
 
-Latest request: replaced the 6-card KPI strip above the Gantt/Kanban views with a compact numbers-only pill in the top header bar in `src/App.tsx` (preserving status color-coding, tooltips, and click-to-filter).
+Latest request: combined the `Hide Gantt controls` and `Expand Gantt` buttons into a single toggle button placed at the top-left of the Gantt controls bar, and removed the `Cairo · Weekend hours optional` pill from the top header in `src/App.tsx`.
 
-Earlier work: added the read-only 4-digit product number (`itemNumber`) to the `Edit product` modal in `src/App.tsx`, replaced the Gantt column width lock text button with `Lock` / `Unlock` icons, made the Backlog → In Progress kickoff note optional, and added manager drag ordering for Gantt projects and products.
+Earlier work: replaced the 6-card KPI strip above the Gantt/Kanban views with a compact numbers-only pill in the top header bar, added the read-only 4-digit product number (`itemNumber`) to the `Edit product` modal, replaced the Gantt column width lock text button with `Lock` / `Unlock` icons, and made the Backlog → In Progress kickoff note optional.
 
 ## Scope and verification
 

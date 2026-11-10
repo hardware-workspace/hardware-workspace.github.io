@@ -1939,9 +1939,6 @@ export default function App({ account, onSignOut }) {
                     <h1 className="font-bold text-sm sm:text-base tracking-tight text-slate-900 dark:text-white">
                       CommTeam Task Manager
                     </h1>
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700 dark:bg-teal-950/80 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hidden md:inline">
-                      Cairo · Weekend hours optional
-                    </span>
                   </div>
 
                 </div>
@@ -2134,11 +2131,7 @@ export default function App({ account, onSignOut }) {
           {workspace.status}
           {workspace.failed && <><button className="ml-3 underline" onClick={workspace.retrySave}>Retry save</button><button className="ml-3 underline" onClick={workspace.reload}>Reload shared copy</button></>}
         </div>}
-        {activeTab === 'gantt' && <div className="flex flex-wrap gap-2 px-3 pt-2 text-xs shrink-0">
-          <button className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2" aria-expanded={ganttControls} onClick={()=>setGanttControls(!ganttControls)}>{ganttControls ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}{ganttControls?'Hide':'Show'} Gantt controls</button>
-          <button className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2" aria-pressed={ganttExpanded} onClick={()=>{setGanttExpanded(!ganttExpanded);setGanttControls(ganttExpanded);}}>{ganttExpanded ? <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" /> : <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />}{ganttExpanded?'Exit expanded view':'Expand Gantt'}</button>
-        </div>}
-        {workspace.ready && (activeTab === 'kanban' || (activeTab === 'gantt' && ganttControls)) && (
+        {workspace.ready && (activeTab === 'kanban' || (activeTab === 'gantt' && ganttControls && !ganttExpanded)) && (
           <div className="workspace-filters shrink-0 px-3 lg:px-6 pt-2 space-y-2">
             <button aria-expanded={mobileFiltersOpen} onClick={()=>setMobileFiltersOpen(!mobileFiltersOpen)} className="md:hidden w-full flex items-center justify-between bg-white dark:bg-slate-900 border rounded-lg px-3 py-2 text-sm"><span className="flex items-center gap-2"><Filter size={16}/>Search & filters</span>{mobileFiltersOpen?'Hide':'Show'}</button>
             {/* Persistent Filter Toolbar */}
@@ -2302,7 +2295,13 @@ export default function App({ account, onSignOut }) {
           {activeTab === 'dashboard' && <Dashboard tasks={tasks} projects={projects} users={users} currentUser={currentUser} onSelectTask={setSelectedTaskId} onOpenGantt={()=>setActiveTab('gantt')} itemNumber={itemNumber}/>}
           {activeTab === 'gantt' && (
             <GanttView
-              controlsVisible={ganttControls || ganttExpanded}
+              controlsVisible={ganttControls && !ganttExpanded}
+              ganttExpanded={ganttExpanded}
+              onToggleGanttFocus={() => {
+                const nextExpanded = !ganttExpanded;
+                setGanttExpanded(nextExpanded);
+                setGanttControls(!nextExpanded);
+              }}
               productLines={productLines}
               projects={projects}
               tasks={filteredTasks}
@@ -3083,6 +3082,8 @@ export default function App({ account, onSignOut }) {
 // ============================================================================
 function GanttView({
   controlsVisible,
+  ganttExpanded = false,
+  onToggleGanttFocus,
   productLines,
   projects,
   tasks,
@@ -3625,11 +3626,50 @@ function GanttView({
 
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+      {!controlsVisible && onToggleGanttFocus && (
+        <div className="flex items-center shrink-0">
+          <button
+            type="button"
+            aria-pressed={ganttExpanded}
+            onClick={onToggleGanttFocus}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-colors"
+            title="Show Gantt controls and exit expanded view"
+          >
+            <Minimize2 className="h-3.5 w-3.5 text-indigo-600" aria-hidden="true" />
+            <span>Show Gantt controls</span>
+          </button>
+        </div>
+      )}
       {controlsVisible && <>
-      <button aria-expanded={timelineOptionsOpen} onClick={()=>setTimelineOptionsOpen(!timelineOptionsOpen)} className="md:hidden shrink-0 flex justify-between border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900"><span>Timeline options</span><span>{timelineOptionsOpen?'Hide':'Show'}</span></button>
+      <div className="flex md:hidden gap-2 shrink-0">
+        {onToggleGanttFocus && (
+          <button
+            type="button"
+            aria-pressed={ganttExpanded}
+            onClick={onToggleGanttFocus}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold bg-white dark:bg-slate-900"
+          >
+            <Maximize2 className="h-3.5 w-3.5 text-indigo-600" aria-hidden="true" />
+            <span>Expand Gantt</span>
+          </button>
+        )}
+        <button aria-expanded={timelineOptionsOpen} onClick={()=>setTimelineOptionsOpen(!timelineOptionsOpen)} className="flex-1 flex justify-between border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900"><span>Timeline options</span><span>{timelineOptionsOpen?'Hide':'Show'}</span></button>
+      </div>
       {/* Top Gantt Controls Bar: Expand/Collapse + Comprehensive Period Filter (Week, Month, Quarter, Year, Custom) + Alt+Wheel Zoom */}
       <div className={`${timelineOptionsOpen ? 'flex' : 'hidden'} md:flex gantt-options shrink-0 bg-white dark:bg-slate-900 px-3.5 py-2 rounded-xl border border-stone-200 dark:border-slate-800 shadow-sm flex-wrap items-center justify-between gap-2 text-xs`}>
         <div className="flex flex-wrap items-center gap-1.5">
+          {onToggleGanttFocus && (
+            <button
+              type="button"
+              aria-pressed={ganttExpanded}
+              onClick={onToggleGanttFocus}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-semibold transition-colors"
+              title="Hide Gantt controls and expand Gantt chart"
+            >
+              <Maximize2 className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Expand Gantt</span>
+            </button>
+          )}
           <button
             onClick={onExpandAll}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 text-slate-700 dark:text-slate-200 font-semibold transition-colors"
