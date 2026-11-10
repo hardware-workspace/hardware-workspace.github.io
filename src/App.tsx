@@ -2484,7 +2484,11 @@ export default function App({ account, onSignOut }) {
             }
             setEditingProduct(null);
           }} className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-5 space-y-4 shadow-2xl">
-            <h2 className="text-lg font-bold">Edit product</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold">Edit product</h2>
+              <span className="rounded-md bg-stone-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:text-slate-300">#{itemNumber(editingProduct.id)}</span>
+            </div>
+            <label className="block text-sm font-medium">Product number<input readOnly value={itemNumber(editingProduct.id)} className="mt-1 w-full rounded-lg border bg-stone-50 dark:bg-slate-800/60 p-2 text-slate-500 dark:text-slate-400" /></label>
             <label className="block text-sm font-medium">Name<input required value={editingProduct.name} onChange={(event) => setEditingProduct({ ...editingProduct, name: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" /></label>
             <label className="block text-sm font-medium">Description<textarea value={editingProduct.description} onChange={(event) => setEditingProduct({ ...editingProduct, description: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" rows={3} /></label>
             <fieldset className="max-h-32 overflow-auto space-y-1"><legend className="text-sm font-medium">Product assignees</legend>

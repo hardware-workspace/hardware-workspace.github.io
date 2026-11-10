@@ -2,9 +2,9 @@
 
 ## Request and result
 
-Latest request: made the Backlog → In Progress kickoff note optional in `src/App.tsx`. An empty note creates no comment; a supplied note is saved. Frontend build and live release should be checked against the latest commit.
+Latest request: added the read-only 4-digit product number (`itemNumber`) to the `Edit product` modal in `src/App.tsx`, and replaced the Gantt column width lock text button with `Lock` / `Unlock` icons.
 
-Earlier work: manager drag ordering for Gantt projects and products (within a project), task sorting, and an assignee directory refresh every 30 seconds or when the window regains focus. Product assignees show name and email from active non-viewer database users.
+Earlier work: made the Backlog → In Progress kickoff note optional in `src/App.tsx`, manager drag ordering for Gantt projects and products (within a project), task sorting, and an assignee directory refresh every 30 seconds or when the window regains focus. Product assignees show name and email from active non-viewer database users.
 
 ## Scope and verification
 
