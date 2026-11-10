@@ -2,7 +2,9 @@
 
 ## Request and result
 
-Latest request: removed the "Rows 100% (Alt+Shift+Wheel)" hint from the Gantt controls bar (Alt+Shift+Wheel row zoom still works).
+Latest request: admin rename showed "The account service is unavailable…". Verified the `admin-users` Edge Function IS deployed (returns its own 401 JSON). The message was a misleading fallback: `functions.invoke` hides non-2xx bodies in `error.context`. `src/AdminPage.tsx` now reads that body and shows the real reason (commit `c3e05ad`). Also fixed a stray Windows-1252 byte in the "Delete user…" button. Next step: get the real error text from the user; if it is the 403 "System administrator accounts…" guard, that is intentional server-side protection.
+
+Before that: removed the "Rows 100% (Alt+Shift+Wheel)" hint from the Gantt controls bar (Alt+Shift+Wheel row zoom still works).
 
 Before that: added text labels (Total, Done, In Progress, Blocked, Backlog, Overdue) beside each number in the compact header count pill in `src/App.tsx`.
 
