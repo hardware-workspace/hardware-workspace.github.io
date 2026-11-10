@@ -1657,7 +1657,7 @@ export default function App({ account, onSignOut }) {
       return;
     }
 
-    // Transition from Backlog -> In Progress requires entering a kickoff note
+    // A kickoff note can be added when moving from Backlog to In Progress.
     if (task.status === 'backlog' && targetStatus === 'in_progress') {
       setInProgressModalState({
         taskId,
@@ -2599,7 +2599,7 @@ export default function App({ account, onSignOut }) {
         )}
 
         {/* ==================================================================== */}
-        {/* TRANSITION MODAL: BACKLOG -> IN PROGRESS (Requires Kickoff Note) */}
+        {/* TRANSITION MODAL: BACKLOG -> IN PROGRESS (Optional Kickoff Note) */}
         {/* ==================================================================== */}
         {inProgressModalState && (
           <div
@@ -2615,7 +2615,7 @@ export default function App({ account, onSignOut }) {
                 <h3 className="font-bold text-lg">Start Task (Backlog → In Progress)</h3>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                Please enter a kickoff note describing your initial plan or lab setup before moving this task to <strong>In Progress</strong>.
+                Add a kickoff note if useful, or start the task without one.
               </p>
               <textarea
                 rows={3}
@@ -2634,25 +2634,23 @@ export default function App({ account, onSignOut }) {
                 </button>
                 <button
                   onClick={() => {
-                    if (!inProgressModalState.note.trim()) {
-                      pushToast('error', 'Note Required', 'Please add a short note when transitioning from Backlog to In Progress.');
-                      return;
-                    }
                     updateTask(
                       inProgressModalState.taskId,
                       { status: 'in_progress' },
                       { allowUndo: true, actionLabel: 'Task moved to In Progress' }
                     );
-                    handleAddComment(
-                      inProgressModalState.taskId,
-                      `[Transition Backlog → In Progress]: ${inProgressModalState.note.trim()}`
-                    );
+                    if (inProgressModalState.note.trim()) {
+                      handleAddComment(
+                        inProgressModalState.taskId,
+                        `[Transition Backlog → In Progress]: ${inProgressModalState.note.trim()}`
+                      );
+                    }
                     setInProgressModalState(null);
-                    pushToast('success', 'Task In Progress', 'Kickoff note logged and status updated.');
+                    pushToast('success', 'Task In Progress', 'Task status updated.');
                   }}
                   className="px-4 py-2 rounded-xl text-sm font-semibold bg-sky-600 hover:bg-sky-700 text-white"
                 >
-                  Start & Save Note
+                  Start Task
                 </button>
               </div>
             </div>
