@@ -2,9 +2,9 @@
 
 ## Request and result
 
-Latest request: added the read-only 4-digit product number (`itemNumber`) to the `Edit product` modal in `src/App.tsx`, and replaced the Gantt column width lock text button with `Lock` / `Unlock` icons.
+Latest request: replaced the 6-card KPI strip above the Gantt/Kanban views with a compact numbers-only pill in the top header bar in `src/App.tsx` (preserving status color-coding, tooltips, and click-to-filter).
 
-Earlier work: made the Backlog → In Progress kickoff note optional in `src/App.tsx`, manager drag ordering for Gantt projects and products (within a project), task sorting, and an assignee directory refresh every 30 seconds or when the window regains focus. Product assignees show name and email from active non-viewer database users.
+Earlier work: added the read-only 4-digit product number (`itemNumber`) to the `Edit product` modal in `src/App.tsx`, replaced the Gantt column width lock text button with `Lock` / `Unlock` icons, made the Backlog → In Progress kickoff note optional, and added manager drag ordering for Gantt projects and products.
 
 ## Scope and verification
 

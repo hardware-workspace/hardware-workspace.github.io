@@ -1301,12 +1301,12 @@ export default function App({ account, onSignOut }) {
     const overdue = filteredTasks.filter((t) => isTaskOverdue(t)).length;
 
     return [
-      { id: 'total', label: 'Total', count: total, pct: 100, color: 'border-indigo-600', bg: 'bg-indigo-50/40 dark:bg-indigo-950/20' },
-      { id: 'done', label: 'Done', count: done, pct: pct(done), color: 'border-emerald-600', bg: 'bg-emerald-50/40 dark:bg-emerald-950/20' },
-      { id: 'in_progress', label: 'In Progress', count: inProgress, pct: pct(inProgress), color: 'border-sky-600', bg: 'bg-sky-50/40 dark:bg-sky-950/20' },
-      { id: 'blocked', label: 'Blocked', count: blocked, pct: pct(blocked), color: 'border-amber-600', bg: 'bg-amber-50/40 dark:bg-amber-950/20' },
-      { id: 'backlog', label: 'Backlog', count: backlog, pct: pct(backlog), color: 'border-slate-400', bg: 'bg-slate-50/40 dark:bg-slate-900/40' },
-      { id: 'overdue', label: 'Overdue', count: overdue, pct: pct(overdue), color: 'border-rose-600', bg: 'bg-rose-50/40 dark:bg-rose-950/20' },
+      { id: 'total', label: 'Total', count: total, pct: 100, text: 'text-indigo-600 dark:text-indigo-400' },
+      { id: 'done', label: 'Done', count: done, pct: pct(done), text: 'text-emerald-600 dark:text-emerald-400' },
+      { id: 'in_progress', label: 'In Progress', count: inProgress, pct: pct(inProgress), text: 'text-sky-600 dark:text-sky-400' },
+      { id: 'blocked', label: 'Blocked', count: blocked, pct: pct(blocked), text: 'text-amber-600 dark:text-amber-400' },
+      { id: 'backlog', label: 'Backlog', count: backlog, pct: pct(backlog), text: 'text-slate-600 dark:text-slate-300' },
+      { id: 'overdue', label: 'Overdue', count: overdue, pct: pct(overdue), text: 'text-rose-600 dark:text-rose-400' },
     ];
   }, [filteredTasks]);
 
@@ -1974,6 +1974,37 @@ export default function App({ account, onSignOut }) {
                   );
                 })}
               </nav>
+
+              {/* Compact KPI Numbers in Header */}
+              {workspace.ready && (
+                <div
+                  aria-label="Task counts"
+                  className="inline-flex items-center gap-0.5 rounded-lg bg-stone-100 dark:bg-slate-800/90 px-2 py-1 text-[11px] font-bold shrink-0"
+                >
+                  {kpiStats.map((k, idx) => (
+                    <React.Fragment key={k.id}>
+                      {idx > 0 && <span className="text-slate-300 dark:text-slate-600">·</span>}
+                      <button
+                        type="button"
+                        title={`${k.label}: ${k.count} (${k.pct}%)`}
+                        aria-label={`${k.label}: ${k.count}`}
+                        onClick={() => {
+                          if (k.id === 'overdue') setOverdueOnly((prev) => !prev);
+                          else if (k.id === 'total') clearAllFilters();
+                          else {
+                            setSelectedStatuses((prev) =>
+                              prev.includes(k.id) ? prev.filter((s) => s !== k.id) : [k.id]
+                            );
+                          }
+                        }}
+                        className={`px-1 rounded hover:bg-white dark:hover:bg-slate-700 transition-colors ${k.text}`}
+                      >
+                        {k.count}
+                      </button>
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Right Actions */}
@@ -2109,37 +2140,6 @@ export default function App({ account, onSignOut }) {
         </div>}
         {workspace.ready && (activeTab === 'kanban' || (activeTab === 'gantt' && ganttControls)) && (
           <div className="workspace-filters shrink-0 px-3 lg:px-6 pt-2 space-y-2">
-            {/* 6-Card KPI Strip */}
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 sm:gap-2">
-              {kpiStats.map((k) => (
-                <div
-                  key={k.id}
-                  onClick={() => {
-                    if (k.id === 'overdue') setOverdueOnly((prev) => !prev);
-                    else if (k.id === 'total') clearAllFilters();
-                    else {
-                      setSelectedStatuses((prev) =>
-                        prev.includes(k.id) ? prev.filter((s) => s !== k.id) : [k.id]
-                      );
-                    }
-                  }}
-                  className={`px-2.5 py-1.5 sm:py-2 rounded-xl border-l-4 ${k.color} ${k.bg} bg-white dark:bg-slate-900 border border-stone-200/80 dark:border-slate-800 shadow-xs cursor-pointer hover:scale-[1.01] transition-transform flex items-center justify-between`}
-                >
-                  <div>
-                    <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 dark:text-slate-400 block truncate">
-                      {k.label}
-                    </span>
-                    <div className="text-base sm:text-xl font-extrabold text-slate-900 dark:text-white leading-tight">
-                      {k.count}
-                    </div>
-                  </div>
-                  <span className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/80 dark:bg-slate-800 hidden xs:inline">
-                    {k.pct}%
-                  </span>
-                </div>
-              ))}
-            </div>
-
             <button aria-expanded={mobileFiltersOpen} onClick={()=>setMobileFiltersOpen(!mobileFiltersOpen)} className="md:hidden w-full flex items-center justify-between bg-white dark:bg-slate-900 border rounded-lg px-3 py-2 text-sm"><span className="flex items-center gap-2"><Filter size={16}/>Search & filters</span>{mobileFiltersOpen?'Hide':'Show'}</button>
             {/* Persistent Filter Toolbar */}
             <div className={`${mobileFiltersOpen ? 'flex' : 'hidden'} md:flex mobile-filter-toolbar bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-stone-200 dark:border-slate-800 shadow-xs flex-wrap items-center justify-between gap-2`}>
