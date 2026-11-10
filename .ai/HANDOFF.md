@@ -1,22 +1,16 @@
 # Latest handoff
 
-## Request
+## Request and result
 
-Make the existing project portable across AI coding agents, with GitHub as source of truth and one concise shared memory system.
+Added manager drag ordering for Gantt projects and products (within a project), a task sort control for manual order, planned end, completion, start, status, and name; a light strike on completed task titles; and an assignee directory refresh every 30 seconds or when the window regains focus. Product assignees show name and email from active non-viewer database users.
 
-## Completed
+## Scope and verification
 
-- Centralized startup, development, publishing, safety, and handoff rules in `AGENTS.md`.
-- Added small shared memory files under `.ai/`, plus `CLAUDE.md` and `GEMINI.md` pointers.
-- Documented local, GitHub-only, MCP-capable, and chat-only access modes without requiring provider credentials or application changes.
-- Updated `README.md` to direct agents to the shared memory and remove an outdated task-count claim.
-
-## Verification and boundaries
-
-- Documentation-only change. No app code, dependencies, deployment workflow, Supabase schema, production records, or authentication settings changed.
-- Verification: documentation diff and local links checked; no application tests are required for Markdown-only changes. Git publication outcome: see `git log -1`. Markdown-only pushes do not start the Pages workflow.
+- Modified `src/App.tsx` and these short memory files. No schema or production records were directly changed.
+- `npm run check:focused`, `npm run build`, and a whitespace-aware diff check passed.
+- GitHub commit and Pages deployment: check `git log -1` and the latest Pages workflow. Do not claim a live release without the workflow verification.
 - Existing untracked user files were left untouched.
 
 ## Exact next step
 
-Take the next user-requested feature. Start with `AGENTS.md` and `.ai/CURRENT_STATE.md`; inspect only the relevant source files.
+Take the next user request. Read `AGENTS.md` and the short memory files, then inspect only relevant code.

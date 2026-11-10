@@ -54,7 +54,8 @@ import {
   ArrowRight,
   GitBranch,
   Maximize2,
-  Minimize2
+  Minimize2,
+  GripVertical
 } from 'lucide-react';
 
 // ============================================================================
@@ -978,13 +979,23 @@ export default function App({ account, onSignOut }) {
   const setComments = workspace.setter('comments');
   const setActivityLog = workspace.setter('activityLog');
   useEffect(() => {
-    if (!supabase) return;
+    if (!shared || !supabase) return;
     let active = true;
-    supabase.rpc('task_assignee_directory').then(({data,error}) => {
-      if(active && !error && data) setUsers(previous => [...data.map(user => ({ ...user, initials: user.name.trim().split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase(), color: 'bg-indigo-600' })), ...previous.filter(user => !data.some(real => real.id === user.id))]);
-    });
-    return () => { active = false; };
-  }, []);
+    const refreshUsers = async () => {
+      const { data, error } = await supabase.rpc('task_assignee_directory');
+      if (active && !error && Array.isArray(data)) {
+        setUsers(data.map(user => ({
+          ...user,
+          initials: (user.name || user.email || '?').trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase(),
+          color: 'bg-indigo-600',
+        })));
+      }
+    };
+    void refreshUsers();
+    const interval = setInterval(refreshUsers, 30000);
+    window.addEventListener('focus', refreshUsers);
+    return () => { active = false; clearInterval(interval); window.removeEventListener('focus', refreshUsers); };
+  }, [shared]);
   const [dryRunReport, setDryRunReport] = useState(initialData.dryRunReport);
 
   useEffect(() => { if (shared) setUndoHistory([]); }, [workspace.remoteRevision]);
@@ -1048,6 +1059,32 @@ export default function App({ account, onSignOut }) {
       ? Math.max(last, Number(item.position) || 0) : last, 0);
     return [...previous, { ...task, position: lastPosition + 1 }];
   });
+  const reorderGroup = (kind, sourceId, targetId) => {
+    if (sourceId === targetId) return;
+    if (kind === 'project') {
+      setProductLines(previous => {
+        const ordered = [...previous].sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+        const from = ordered.findIndex(item => item.id === sourceId);
+        const to = ordered.findIndex(item => item.id === targetId);
+        if (from < 0 || to < 0) return previous;
+        ordered.splice(to, 0, ...ordered.splice(from, 1));
+        return ordered.map((item, index) => ({ ...item, position: index + 1 }));
+      });
+    } else {
+      setProjects(previous => {
+        const source = previous.find(item => item.id === sourceId);
+        const target = previous.find(item => item.id === targetId);
+        if (!source || !target || source.product_line_id !== target.product_line_id) return previous;
+        const siblings = previous.filter(item => item.product_line_id === source.product_line_id)
+          .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+        const from = siblings.findIndex(item => item.id === sourceId);
+        const to = siblings.findIndex(item => item.id === targetId);
+        siblings.splice(to, 0, ...siblings.splice(from, 1));
+        const positions = new Map(siblings.map((item, index) => [item.id, index + 1]));
+        return previous.map(item => positions.has(item.id) ? { ...item, position: positions.get(item.id) } : item);
+      });
+    }
+  };
   const [newTaskDefaultStatus, setNewTaskDefaultStatus] = useState('backlog');
   const [splitTaskModalTarget, setSplitTaskModalTarget] = useState(null);
   const [dryRunModalOpen, setDryRunModalOpen] = useState(false);
@@ -2256,7 +2293,7 @@ export default function App({ account, onSignOut }) {
         {/* MAIN VIEWPORT CONTENT */}
         {/* ==================================================================== */}
         <main className="workspace-main flex-1 min-h-0 px-3 lg:px-6 py-2 overflow-hidden flex flex-col">
-          {!workspace.ready ? <p role="status" className="p-5">Loading the shared workspace…</p> : <>
+          {!workspace.ready ? <p role="status" className="p-5">Loading the shared workspaceâ€¦</p> : <>
           {shared && !projects.length && activeTab === 'dashboard' && <p className="mb-2 rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
             {account.role === 'manager' ? 'Create a project and a product to start saving shared tasks.' : 'Your shared workspace is empty. Tasks will appear here once a manager adds them.'}
           </p>}
@@ -2288,6 +2325,7 @@ export default function App({ account, onSignOut }) {
               onCollapseAll={collapseAllGanttGroups}
               collapseLabel={ganttCollapseLabel}
               onSelectTask={(taskId) => setSelectedTaskId(taskId)}
+              onReorderGroup={currentUser.role === 'manager' ? reorderGroup : null}
               onGroupMenu={currentUser.role === 'manager' ? (event, kind, item) => {
                 event.preventDefault();
                 setGroupMenu({ kind, item, x: Math.max(0, Math.min(event.clientX, window.innerWidth - 180)),
@@ -2448,7 +2486,7 @@ export default function App({ account, onSignOut }) {
             <label className="block text-sm font-medium">Name<input required value={editingProduct.name} onChange={(event) => setEditingProduct({ ...editingProduct, name: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" /></label>
             <label className="block text-sm font-medium">Description<textarea value={editingProduct.description} onChange={(event) => setEditingProduct({ ...editingProduct, description: event.target.value })} className="mt-1 w-full rounded-lg border p-2 dark:bg-slate-800" rows={3} /></label>
             <fieldset className="max-h-32 overflow-auto space-y-1"><legend className="text-sm font-medium">Product assignees</legend>
-              {users.filter(user => user.is_active && user.role !== 'viewer').map(user => <label key={user.id} className="block text-sm"><input type="checkbox" className="mr-2" checked={editingProduct.assignee_ids.includes(user.id)} onChange={event => { const checked = event.target.checked; setEditingProduct(previous => ({ ...previous, assignee_ids: checked ? [...previous.assignee_ids, user.id] : previous.assignee_ids.filter(id => id !== user.id) })); }} />{user.name}</label>)}
+              {users.filter(user => user.is_active && user.role !== 'viewer').map(user => <label key={user.id} className="block text-sm"><input type="checkbox" className="mr-2" checked={editingProduct.assignee_ids.includes(user.id)} onChange={event => { const checked = event.target.checked; setEditingProduct(previous => ({ ...previous, assignee_ids: checked ? [...previous.assignee_ids, user.id] : previous.assignee_ids.filter(id => id !== user.id) })); }} />{user.name} <span className="text-slate-500">({user.email})</span></label>)}
             </fieldset>
             <button type="button" className="text-rose-600 text-sm" onClick={() => {
               if (!window.confirm('Remove this product from active views? Its tasks are retained and the product can be restored in Settings.')) return;
@@ -3060,12 +3098,31 @@ function GanttView({
   onCollapseAll,
   collapseLabel,
   onSelectTask,
+  onReorderGroup,
   onGroupMenu,
   onUpdateTask,
   onRequestSplitTask,
   pushToast,
 }) {
   const [overlayMemberId, setOverlayMemberId] = useState('all');
+  const [taskSort, setTaskSort] = useState('position');
+  const draggedGroup = useRef(null);
+  const suppressGroupClick = useRef(false);
+  const beginGroupDrag = (event, kind, item) => {
+    draggedGroup.current = { kind, id: item.id, parentId: item.product_line_id };
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', item.id);
+  };
+  const dropGroup = (event, kind, item) => {
+    const dragged = draggedGroup.current;
+    if (!dragged || dragged.kind !== kind || (kind === 'product' && dragged.parentId !== item.product_line_id)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressGroupClick.current = true;
+    onReorderGroup?.(kind, dragged.id, item.id);
+    draggedGroup.current = null;
+    setTimeout(() => { suppressGroupClick.current = false; }, 200);
+  };
   const [periodPreset, setPeriodPreset] = useState('month'); // 'week' | 'month' | 'quarter' | 'year' | 'custom'
   const currentYear = Number(TODAY_CAIRO.slice(0, 4));
   const [selectedYear, setSelectedYear] = useState(currentYear);
@@ -3401,15 +3458,26 @@ function GanttView({
 
   // Keep undated tasks in the hierarchy so they can be scheduled from Gantt.
   const groupedHierarchy = useMemo(() => {
+    const compareTasks = (a, b) => {
+      const manual = (Number(a.position) || 0) - (Number(b.position) || 0);
+      if (taskSort === 'position') return manual;
+      if (taskSort === 'title') return a.title.localeCompare(b.title) || manual;
+      if (taskSort === 'status') return a.status.localeCompare(b.status) || manual;
+      const dateA = taskSort === 'completed_at' ? a.completed_at : taskSort === 'start_date' ? a.start_date : getPlannedEndDate(a);
+      const dateB = taskSort === 'completed_at' ? b.completed_at : taskSort === 'start_date' ? b.start_date : getPlannedEndDate(b);
+      return (!dateA) - (!dateB) || String(dateA || '').localeCompare(String(dateB || '')) || manual;
+    };
 
-    const groups = productLines
+    const groups = [...productLines]
+      .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0))
       .map((pl) => {
         const plProjects = projects
           .filter((p) => p.product_line_id === pl.id && !p.archived)
+          .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0))
           .map((proj) => {
             const projTasks = tasks
               .filter((t) => t.project_id === proj.id)
-              .sort((a, b) => a.position - b.position);
+              .sort(compareTasks);
             return { ...proj, tasks: projTasks };
           })
           .filter((proj) => showEmptyGroups || proj.tasks.length > 0);
@@ -3420,7 +3488,7 @@ function GanttView({
       .filter((pl) => !pl.archived && (showEmptyGroups || pl.totalTasks > 0));
 
     return groups;
-  }, [productLines, projects, tasks, showEmptyGroups]);
+  }, [productLines, projects, tasks, showEmptyGroups, taskSort]);
 
   // Flatten visible rows for SVG dependency wire coordinates
   const visibleTaskRows = useMemo(() => {
@@ -3585,6 +3653,19 @@ function GanttView({
               disabled={bulkStatus === 'blocked' && !bulkReason.trim()}
               onClick={() => onBulkStatusChange(checkedTasks, bulkStatus, bulkReason.trim())}>Apply to {checkedTasks.length} selected</button>
           </div>}
+
+          <label className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+            Sort tasks
+            <select aria-label="Sort Gantt tasks" value={taskSort} onChange={event => setTaskSort(event.target.value)}
+              className="rounded-lg border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1">
+              <option value="position">Manual order</option>
+              <option value="due_date">Planned end date</option>
+              <option value="completed_at">Completion date</option>
+              <option value="start_date">Start date</option>
+              <option value="status">Status</option>
+              <option value="title">Task name</option>
+            </select>
+          </label>
 
 
           <button
@@ -4003,7 +4084,9 @@ function GanttView({
                       {/* Project Header Row */}
                       <div
                         style={{ height: `${groupRowHeight}px` }}
-                        onClick={() => toggleGroup(plKey)}
+                        onClick={() => { if (!suppressGroupClick.current) toggleGroup(plKey); }}
+                        onDragOver={(event) => { if (onReorderGroup && draggedGroup.current?.kind === 'project') event.preventDefault(); }}
+                        onDrop={(event) => dropGroup(event, 'project', pl)}
                         onContextMenu={(event) => onGroupMenu?.(event, 'project', pl)}
                         title={onGroupMenu ? 'Right-click for project actions' : pl.description || undefined}
                         className="flex items-center bg-stone-100/90 dark:bg-slate-800/80 cursor-pointer hover:bg-stone-200/60 dark:hover:bg-slate-800 transition-colors"
@@ -4013,6 +4096,10 @@ function GanttView({
                           className="gantt-group-label sticky left-0 z-30 bg-stone-100 dark:bg-slate-800 px-4 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
                         >
                           <div className="flex min-w-0 items-center gap-2 font-bold text-sm text-indigo-950 dark:text-indigo-200">
+                            {onReorderGroup && <span draggable onDragStart={event => beginGroupDrag(event, 'project', pl)}
+                              onDragEnd={() => { draggedGroup.current = null; }}
+                              onClick={event => event.stopPropagation()} title="Drag to reorder projects" aria-label={'Drag project ' + pl.name}
+                              className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-indigo-600"><GripVertical className="w-4 h-4" /></span>}
                             {plCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                             <span className="px-1.5 py-0.5 text-[10px] rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 uppercase">
                               Project
@@ -4037,7 +4124,9 @@ function GanttView({
                               {/* Product Subheader */}
                               <div
                                 style={{ height: `${groupRowHeight}px` }}
-                                onClick={() => toggleGroup(projKey)}
+                                onClick={() => { if (!suppressGroupClick.current) toggleGroup(projKey); }}
+                                onDragOver={(event) => { if (onReorderGroup && draggedGroup.current?.kind === 'product' && draggedGroup.current.parentId === proj.product_line_id) event.preventDefault(); }}
+                                onDrop={(event) => dropGroup(event, 'product', proj)}
                                 onContextMenu={(event) => onGroupMenu?.(event, 'product', proj)}
                                 title={onGroupMenu ? 'Right-click for product actions' : proj.description || undefined}
                                 className="flex items-center bg-stone-50/90 dark:bg-slate-900/90 cursor-pointer hover:bg-stone-100 dark:hover:bg-slate-800/50"
@@ -4047,6 +4136,10 @@ function GanttView({
                                   className="gantt-group-label sticky left-0 z-30 bg-stone-50 dark:bg-slate-900 pl-7 pr-4 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
                                 >
                                   <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">
+                                    {onReorderGroup && <span draggable onDragStart={event => beginGroupDrag(event, 'product', proj)}
+                                      onDragEnd={() => { draggedGroup.current = null; }}
+                                      onClick={event => event.stopPropagation()} title="Drag to reorder products in this project" aria-label={'Drag product ' + proj.name}
+                                      className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-teal-600"><GripVertical className="w-3.5 h-3.5" /></span>}
                                     {projCollapsed ? (
                                       <ChevronRight className="w-3.5 h-3.5 shrink-0" />
                                     ) : (
@@ -4110,7 +4203,7 @@ function GanttView({
                                       >
                                          {onBulkStatusChange && canEditTask(task) && <input type="checkbox" aria-label={'Select ' + task.title} className="mr-2" checked={checkedTasks.includes(task.id)} onClick={e=>e.stopPropagation()} onChange={e=>{const checked=e.target.checked;setCheckedTasks(previous=>checked ? [...previous, task.id] : previous.filter(id=>id!==task.id));}} />}
                                         <div className="min-w-0 flex-1 pr-2">
-                                          <div className="text-xs text-slate-800 dark:text-slate-100 font-bold leading-snug line-clamp-2">
+                                          <div className={`text-xs text-slate-800 dark:text-slate-100 font-bold leading-snug line-clamp-2 ${task.status === 'done' ? 'line-through decoration-1 decoration-slate-400/70' : ''}`}>
                                             {task.title} <small className="text-slate-500">{itemNumber(task.id)}</small>
                                           </div>
                                           {rowZoom >= 1 && <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight line-clamp-2">
