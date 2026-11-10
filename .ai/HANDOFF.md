@@ -2,7 +2,9 @@
 
 ## Request and result
 
-Latest request: added a compact single-row Gantt controls bar next to `Show Gantt controls` when the Gantt is in expanded / hidden-controls mode in `src/App.tsx` (Expand/Collapse All, Jump to Today, Week/Month/Quarter/Year period switch, Sort tasks, Dependencies toggle, and Zoom slider).
+Latest request: added text labels (Total, Done, In Progress, Blocked, Backlog, Overdue) beside each number in the compact header count pill in `src/App.tsx`.
+
+Before that: added a compact single-row Gantt controls bar next to `Show Gantt controls` when the Gantt is in expanded / hidden-controls mode in `src/App.tsx` (Expand/Collapse All, Jump to Today, Week/Month/Quarter/Year period switch, Sort tasks, Dependencies toggle, and Zoom slider).
 
 Earlier work: combined `Hide Gantt controls` and `Expand Gantt` into one toggle button on the top-left of the Gantt controls bar, removed the `Cairo · Weekend hours optional` badge from the top header, replaced the 6-card KPI strip with compact header numbers, and added the read-only 4-digit product number (`itemNumber`) to the `Edit product` modal.
 

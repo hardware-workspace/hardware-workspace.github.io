@@ -1994,8 +1994,9 @@ export default function App({ account, onSignOut }) {
                             );
                           }
                         }}
-                        className={`px-1 rounded hover:bg-white dark:hover:bg-slate-700 transition-colors ${k.text}`}
+                        className={`inline-flex items-baseline gap-1 px-1 rounded hover:bg-white dark:hover:bg-slate-700 transition-colors ${k.text}`}
                       >
+                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{k.label}</span>
                         {k.count}
                       </button>
                     </React.Fragment>
