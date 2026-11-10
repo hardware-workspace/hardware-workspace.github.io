@@ -2,7 +2,9 @@
 
 ## Request and result
 
-Added manager drag ordering for Gantt projects and products (within a project), a task sort control for manual order, planned end, completion, start, status, and name; a light strike on completed task titles; and an assignee directory refresh every 30 seconds or when the window regains focus. Product assignees show name and email from active non-viewer database users.
+Latest request: changed completed Gantt task title strikethrough to a thin black line in `src/App.tsx`. Frontend build and live release should be checked against the latest commit.
+
+Earlier work: manager drag ordering for Gantt projects and products (within a project), task sorting, and an assignee directory refresh every 30 seconds or when the window regains focus. Product assignees show name and email from active non-viewer database users.
 
 ## Scope and verification
 

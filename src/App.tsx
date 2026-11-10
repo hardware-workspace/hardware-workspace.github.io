@@ -4203,7 +4203,7 @@ function GanttView({
                                       >
                                          {onBulkStatusChange && canEditTask(task) && <input type="checkbox" aria-label={'Select ' + task.title} className="mr-2" checked={checkedTasks.includes(task.id)} onClick={e=>e.stopPropagation()} onChange={e=>{const checked=e.target.checked;setCheckedTasks(previous=>checked ? [...previous, task.id] : previous.filter(id=>id!==task.id));}} />}
                                         <div className="min-w-0 flex-1 pr-2">
-                                          <div className={`text-xs text-slate-800 dark:text-slate-100 font-bold leading-snug line-clamp-2 ${task.status === 'done' ? 'line-through decoration-1 decoration-slate-400/70' : ''}`}>
+                                          <div className={`text-xs text-slate-800 dark:text-slate-100 font-bold leading-snug line-clamp-2 ${task.status === 'done' ? 'line-through decoration-1 decoration-black' : ''}`}>
                                             {task.title} <small className="text-slate-500">{itemNumber(task.id)}</small>
                                           </div>
                                           {rowZoom >= 1 && <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight line-clamp-2">
