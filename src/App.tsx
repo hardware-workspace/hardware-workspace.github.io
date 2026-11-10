@@ -55,7 +55,9 @@ import {
   GitBranch,
   Maximize2,
   Minimize2,
-  GripVertical
+  GripVertical,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 // ============================================================================
@@ -3851,8 +3853,8 @@ function GanttView({
               {!compactTimeline && <button type="button" aria-pressed={columnLocked}
                   title={columnLocked ? 'Unlock task column width' : 'Lock task column width'}
                   onClick={() => setColumnLocked(previous => !previous)}
-                  className="ml-1 shrink-0 rounded px-1 text-[10px] normal-case text-indigo-600 dark:text-indigo-300">
-                  {columnLocked ? 'Unlock width' : 'Lock width'}
+                  className="ml-1 shrink-0 rounded p-0.5 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors">
+                  {columnLocked ? <Lock size={13} /> : <Unlock size={13} />}
                 </button>}
                 {!compactTimeline && !columnLocked && <span {...resizeHandle('column')}
                   title="Drag to resize the task column" className="absolute inset-y-0 right-0 z-10 w-2 cursor-col-resize touch-none border-r-2 border-indigo-300 hover:bg-indigo-400 focus:bg-indigo-400" />}
