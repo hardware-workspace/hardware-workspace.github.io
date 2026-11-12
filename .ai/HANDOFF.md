@@ -2,7 +2,9 @@
 
 ## Request and result
 
-Latest request: admin rename showed "The account service is unavailable…". Verified the `admin-users` Edge Function IS deployed (returns its own 401 JSON). The message was a misleading fallback: `functions.invoke` hides non-2xx bodies in `error.context`. `src/AdminPage.tsx` now reads that body and shows the real reason (commit `c3e05ad`). Also fixed a stray Windows-1252 byte in the "Delete user…" button. Next step: get the real error text from the user; if it is the 403 "System administrator accounts…" guard, that is intentional server-side protection.
+Latest request: added drag-and-drop animation for project and product rows in the Gantt view. Added `dragGroupState` React state alongside the existing `draggedGroup` ref to drive visual feedback: the dragged row fades to 40 % opacity with a subtle scale; the hovered drop-target row gets a coloured top-border highlight (indigo for projects, teal for products) and a background tint. `endGroupDrag` clears state on drag-end or drop. CSS added to `src/index.css` with `.drag-drop-target-project` and `.drag-drop-target-product` classes with dark-mode variants. Committed `fb29f8a`.
+
+Previous: admin rename showed "The account service is unavailable…". Verified the `admin-users` Edge Function IS deployed (returns its own 401 JSON). The message was a misleading fallback: `functions.invoke` hides non-2xx bodies in `error.context`. `src/AdminPage.tsx` now reads that body and shows the real reason (commit `c3e05ad`). Also fixed a stray Windows-1252 byte in the "Delete user…" button. Next step: get the real error text from the user; if it is the 403 "System administrator accounts…" guard, that is intentional server-side protection.
 
 Before that: removed the "Rows 100% (Alt+Shift+Wheel)" hint from the Gantt controls bar (Alt+Shift+Wheel row zoom still works).
 

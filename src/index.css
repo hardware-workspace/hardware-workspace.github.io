@@ -100,24 +100,57 @@ button:focus-visible, a:focus-visible { outline: 2px solid #6366f1; outline-offs
 
 /* ── Gantt group drag-and-drop animations ── */
 
-/* Drop target: project row — indigo accent top border + subtle blue glow */
-.drag-drop-target-project {
-  background-color: rgba(99, 102, 241, 0.08) !important;
-  box-shadow: inset 0 3px 0 0 #6366f1 !important;
-  transition: background-color 0.1s, box-shadow 0.1s;
+/* Floating card that follows the cursor while dragging */
+.group-drag-floating-card {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  transform: translate(12px, -50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 8px 12px;
+  max-width: 280px;
+  border-radius: 10px;
+  background: rgba(30, 27, 75, 0.92);
+  color: #e0e7ff;
+  font-size: 13px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.32), 0 2px 8px rgba(99,102,241,0.25);
+  backdrop-filter: blur(8px);
+  animation: drag-card-in 0.15s ease-out;
+  white-space: nowrap;
 }
-.dark .drag-drop-target-project {
-  background-color: rgba(99, 102, 241, 0.15) !important;
-  box-shadow: inset 0 3px 0 0 #818cf8 !important;
+.dark .group-drag-floating-card {
+  background: rgba(15, 23, 42, 0.95);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(99,102,241,0.3);
+}
+@keyframes drag-card-in {
+  from { opacity: 0; transform: translate(12px, -50%) scale(0.92); }
+  to   { opacity: 1; transform: translate(12px, -50%) scale(1); }
 }
 
-/* Drop target: product row — teal accent top border + subtle teal glow */
+/* Drop target: project row — indigo accent top border + subtle glow */
+.drag-drop-target-project {
+  background-color: rgba(99, 102, 241, 0.10) !important;
+  box-shadow: inset 0 3px 0 0 #6366f1, 0 0 0 1px rgba(99,102,241,0.25) !important;
+  transition: background-color 0.12s, box-shadow 0.12s;
+}
+.dark .drag-drop-target-project {
+  background-color: rgba(99, 102, 241, 0.18) !important;
+  box-shadow: inset 0 3px 0 0 #818cf8, 0 0 0 1px rgba(129,140,248,0.3) !important;
+}
+
+/* Drop target: product row — teal accent top border + subtle glow */
 .drag-drop-target-product {
-  background-color: rgba(20, 184, 166, 0.08) !important;
-  box-shadow: inset 0 3px 0 0 #14b8a6 !important;
-  transition: background-color 0.1s, box-shadow 0.1s;
+  background-color: rgba(20, 184, 166, 0.10) !important;
+  box-shadow: inset 0 3px 0 0 #14b8a6, 0 0 0 1px rgba(20,184,166,0.25) !important;
+  transition: background-color 0.12s, box-shadow 0.12s;
 }
 .dark .drag-drop-target-product {
-  background-color: rgba(20, 184, 166, 0.15) !important;
-  box-shadow: inset 0 3px 0 0 #2dd4bf !important;
+  background-color: rgba(20, 184, 166, 0.18) !important;
+  box-shadow: inset 0 3px 0 0 #2dd4bf, 0 0 0 1px rgba(45,212,191,0.3) !important;
 }
+
+/* While any group drag is active, override cursor globally */
+body:has(.group-drag-floating-card) { cursor: grabbing !important; }
+body:has(.group-drag-floating-card) * { cursor: grabbing !important; }

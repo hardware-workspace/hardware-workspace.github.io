@@ -3112,29 +3112,46 @@ function GanttView({
 }) {
   const [overlayMemberId, setOverlayMemberId] = useState('all');
   const [taskSort, setTaskSort] = useState('position');
-  const draggedGroup = useRef(null);
   const suppressGroupClick = useRef(false);
-  const [dragGroupState, setDragGroupState] = useState<{ draggingId: string; overId: string | null; kind: string } | null>(null);
-  const beginGroupDrag = (event, kind, item) => {
-    draggedGroup.current = { kind, id: item.id, parentId: item.product_line_id };
-    setDragGroupState({ draggingId: item.id, overId: null, kind });
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', item.id);
-  };
-  const dropGroup = (event, kind, item) => {
-    const dragged = draggedGroup.current;
-    if (!dragged || dragged.kind !== kind || (kind === 'product' && dragged.parentId !== item.product_line_id)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    suppressGroupClick.current = true;
-    onReorderGroup?.(kind, dragged.id, item.id);
-    draggedGroup.current = null;
-    setDragGroupState(null);
-    setTimeout(() => { suppressGroupClick.current = false; }, 200);
-  };
-  const endGroupDrag = () => {
-    draggedGroup.current = null;
-    setDragGroupState(null);
+  const [groupDrag, setGroupDrag] = useState<{
+    kind: string; id: string; parentId?: string; name: string;
+    mouseX: number; mouseY: number; overId: string | null;
+  } | null>(null);
+  const groupDragRef = useRef(groupDrag);
+  groupDragRef.current = groupDrag;
+
+  useEffect(() => {
+    if (!groupDrag) return;
+    const onMove = (e: PointerEvent) => {
+      setGroupDrag(s => s ? { ...s, mouseX: e.clientX, mouseY: e.clientY } : s);
+      // Hit-test which group row the cursor is over
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const row = el?.closest?.('[data-group-drag-id]') as HTMLElement | null;
+      if (row) {
+        const targetId = row.getAttribute('data-group-drag-id');
+        setGroupDrag(s => s && targetId !== s.id ? { ...s, overId: targetId } : s ? { ...s, overId: null } : s);
+      } else {
+        setGroupDrag(s => s ? { ...s, overId: null } : s);
+      }
+    };
+    const onUp = () => {
+      const s = groupDragRef.current;
+      if (s?.overId && s.overId !== s.id) {
+        suppressGroupClick.current = true;
+        onReorderGroup?.(s.kind, s.id, s.overId);
+        setTimeout(() => { suppressGroupClick.current = false; }, 200);
+      }
+      setGroupDrag(null);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); };
+  }, [!!groupDrag]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const beginGroupDrag = (e: React.PointerEvent, kind: string, item: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setGroupDrag({ kind, id: item.id, parentId: item.product_line_id, name: item.name, mouseX: e.clientX, mouseY: e.clientY, overId: null });
   };
   const [periodPreset, setPeriodPreset] = useState('month'); // 'week' | 'month' | 'quarter' | 'year' | 'custom'
   const currentYear = Number(TODAY_CAIRO.slice(0, 4));
@@ -3634,6 +3651,21 @@ function GanttView({
 
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+      {/* Floating drag card that follows the cursor */}
+      {groupDrag && (
+        <div
+          className="group-drag-floating-card"
+          style={{ left: groupDrag.mouseX, top: groupDrag.mouseY }}
+        >
+          <GripVertical className="w-4 h-4 shrink-0 text-white/70" />
+          <span className={`px-1.5 py-0.5 text-[10px] rounded uppercase font-bold ${
+            groupDrag.kind === 'project'
+              ? 'bg-indigo-500/30 text-indigo-100'
+              : 'bg-teal-500/30 text-teal-100'
+          }`}>{groupDrag.kind === 'project' ? 'Project' : 'Product'}</span>
+          <span className="truncate font-semibold">{groupDrag.name}</span>
+        </div>
+      )}
       {!controlsVisible && onToggleGanttFocus && (
         <div className="flex flex-wrap items-center justify-between gap-1.5 shrink-0 bg-white dark:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-stone-200 dark:border-slate-800 shadow-xs text-xs">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -4239,17 +4271,15 @@ function GanttView({
                     <React.Fragment key={pl.id}>
                       {/* Project Header Row */}
                       <div
+                        data-group-drag-id={pl.id}
                         style={{ height: `${groupRowHeight}px` }}
                         onClick={() => { if (!suppressGroupClick.current) toggleGroup(plKey); }}
-                        onDragOver={(event) => { if (onReorderGroup && draggedGroup.current?.kind === 'project') { event.preventDefault(); if (dragGroupState?.overId !== pl.id) setDragGroupState(s => s ? { ...s, overId: pl.id } : s); } }}
-                        onDragLeave={() => { if (dragGroupState?.overId === pl.id) setDragGroupState(s => s ? { ...s, overId: null } : s); }}
-                        onDrop={(event) => dropGroup(event, 'project', pl)}
                         onContextMenu={(event) => onGroupMenu?.(event, 'project', pl)}
                         title={onGroupMenu ? 'Right-click for project actions' : pl.description || undefined}
                         className={[
                           'flex items-center bg-stone-100/90 dark:bg-slate-800/80 cursor-pointer hover:bg-stone-200/60 dark:hover:bg-slate-800 transition-all duration-150 relative',
-                          dragGroupState?.kind === 'project' && dragGroupState.draggingId === pl.id ? 'opacity-40 scale-y-95 ring-1 ring-inset ring-indigo-300 dark:ring-indigo-700' : '',
-                          dragGroupState?.kind === 'project' && dragGroupState.overId === pl.id && dragGroupState.draggingId !== pl.id ? 'drag-drop-target-project' : '',
+                          groupDrag?.kind === 'project' && groupDrag.id === pl.id ? 'opacity-30 scale-[0.97] ring-2 ring-dashed ring-indigo-400 dark:ring-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/30' : '',
+                          groupDrag?.kind === 'project' && groupDrag.overId === pl.id && groupDrag.id !== pl.id ? 'drag-drop-target-project' : '',
                         ].filter(Boolean).join(' ')}
                       >
                         <div
@@ -4257,10 +4287,10 @@ function GanttView({
                           className="gantt-group-label sticky left-0 z-30 bg-stone-100 dark:bg-slate-800 px-4 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
                         >
                           <div className="flex min-w-0 items-center gap-2 font-bold text-sm text-indigo-950 dark:text-indigo-200">
-                            {onReorderGroup && <span draggable onDragStart={event => beginGroupDrag(event, 'project', pl)}
-                              onDragEnd={endGroupDrag}
+                            {onReorderGroup && <span
+                              onPointerDown={e => beginGroupDrag(e, 'project', pl)}
                               onClick={event => event.stopPropagation()} title="Drag to reorder projects" aria-label={'Drag project ' + pl.name}
-                              className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-indigo-600 transition-transform"><GripVertical className="w-4 h-4" /></span>}
+                              className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-indigo-600 transition-transform select-none touch-none"><GripVertical className="w-4 h-4" /></span>}
                             {plCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                             <span className="px-1.5 py-0.5 text-[10px] rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 uppercase">
                               Project
@@ -4284,17 +4314,15 @@ function GanttView({
                             <React.Fragment key={proj.id}>
                               {/* Product Subheader */}
                               <div
+                                data-group-drag-id={proj.id}
                                 style={{ height: `${groupRowHeight}px` }}
                                 onClick={() => { if (!suppressGroupClick.current) toggleGroup(projKey); }}
-                                onDragOver={(event) => { if (onReorderGroup && draggedGroup.current?.kind === 'product' && draggedGroup.current.parentId === proj.product_line_id) { event.preventDefault(); if (dragGroupState?.overId !== proj.id) setDragGroupState(s => s ? { ...s, overId: proj.id } : s); } }}
-                                onDragLeave={() => { if (dragGroupState?.overId === proj.id) setDragGroupState(s => s ? { ...s, overId: null } : s); }}
-                                onDrop={(event) => dropGroup(event, 'product', proj)}
                                 onContextMenu={(event) => onGroupMenu?.(event, 'product', proj)}
                                 title={onGroupMenu ? 'Right-click for product actions' : proj.description || undefined}
                                 className={[
                                   'flex items-center bg-stone-50/90 dark:bg-slate-900/90 cursor-pointer hover:bg-stone-100 dark:hover:bg-slate-800/50 transition-all duration-150 relative',
-                                  dragGroupState?.kind === 'product' && dragGroupState.draggingId === proj.id ? 'opacity-40 scale-y-95 ring-1 ring-inset ring-teal-300 dark:ring-teal-700' : '',
-                                  dragGroupState?.kind === 'product' && dragGroupState.overId === proj.id && dragGroupState.draggingId !== proj.id ? 'drag-drop-target-product' : '',
+                                  groupDrag?.kind === 'product' && groupDrag.id === proj.id ? 'opacity-30 scale-[0.97] ring-2 ring-dashed ring-teal-400 dark:ring-teal-600 bg-teal-50/50 dark:bg-teal-950/30' : '',
+                                  groupDrag?.kind === 'product' && groupDrag.overId === proj.id && groupDrag.id !== proj.id ? 'drag-drop-target-product' : '',
                                 ].filter(Boolean).join(' ')}
                               >
                                 <div
@@ -4302,10 +4330,10 @@ function GanttView({
                                   className="gantt-group-label sticky left-0 z-30 bg-stone-50 dark:bg-slate-900 pl-7 pr-4 flex items-center justify-between border-r-2 border-stone-300 dark:border-slate-700 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
                                 >
                                   <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">
-                                    {onReorderGroup && <span draggable onDragStart={event => beginGroupDrag(event, 'product', proj)}
-                                      onDragEnd={endGroupDrag}
+                                    {onReorderGroup && <span
+                                      onPointerDown={e => beginGroupDrag(e, 'product', proj)}
                                       onClick={event => event.stopPropagation()} title="Drag to reorder products in this project" aria-label={'Drag product ' + proj.name}
-                                      className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-teal-600 transition-transform"><GripVertical className="w-3.5 h-3.5" /></span>}
+                                      className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-teal-600 transition-transform select-none touch-none"><GripVertical className="w-3.5 h-3.5" /></span>}
                                     {projCollapsed ? (
                                       <ChevronRight className="w-3.5 h-3.5 shrink-0" />
                                     ) : (
