@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Calculator, Cpu, Layers, RotateCcw, Wrench, Zap } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Calculator, Cpu, Eraser, Layers, Maximize2, Minimize2, PenTool, RotateCcw, Trash2, Undo2, Wrench, Zap } from 'lucide-react';
 import SignalPulse from './SignalPulse';
 import ScientificCalculator from './ScientificCalculator';
 
@@ -195,6 +195,358 @@ function VoltageDividerSchematic() {
         (V<tspan dy="3" fontSize="11">out</tspan><tspan dy="-3">)</tspan>
       </text>
     </svg>
+  );
+}
+
+interface ScratchPoint {
+  x: number;
+  y: number;
+}
+
+interface ScratchStroke {
+  mode: 'pen' | 'eraser';
+  color: string;
+  width: number;
+  points: ScratchPoint[];
+}
+
+const SCRATCHPAD_COLORS = [
+  { label: 'Engineering Blue', value: '#0b5394' },
+  { label: 'Ink Black', value: '#0f172a' },
+  { label: 'Circuit Red', value: '#e11d48' },
+  { label: 'PCB Green', value: '#16a34a' },
+  { label: 'Signal Amber', value: '#d97706' },
+];
+
+const SCRATCHPAD_WIDTHS = [
+  { label: 'Fine', value: 2 },
+  { label: 'Med', value: 3.5 },
+  { label: 'Bold', value: 6 },
+];
+
+/**
+ * Interactive mouse/pointer freehand writing canvas for circuit notes and math scratchwork.
+ */
+function FreehandScratchpad() {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const strokesRef = useRef<ScratchStroke[]>([]);
+  const currentStrokeRef = useRef<ScratchStroke | null>(null);
+  const isDrawingRef = useRef(false);
+
+  const [toolMode, setToolMode] = useState<'pen' | 'eraser'>('pen');
+  const [inkColor, setInkColor] = useState<string>(SCRATCHPAD_COLORS[0].value);
+  const [strokeWidth, setStrokeWidth] = useState<number>(SCRATCHPAD_WIDTHS[1].value);
+  const [strokeCount, setStrokeCount] = useState(0);
+  const [isWriting, setIsWriting] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const drawStroke = (ctx: CanvasRenderingContext2D, stroke: ScratchStroke) => {
+    const pts = stroke.points;
+    if (pts.length === 0) return;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (stroke.mode === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+      ctx.lineWidth = stroke.width * 5;
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = stroke.color;
+      ctx.fillStyle = stroke.color;
+      ctx.lineWidth = stroke.width;
+    }
+
+    if (pts.length === 1) {
+      const r = (stroke.mode === 'eraser' ? stroke.width * 5 : stroke.width) / 2;
+      ctx.beginPath();
+      ctx.arc(pts[0].x, pts[0].y, Math.max(r, 1), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length - 1; i += 1) {
+      const midX = (pts[i].x + pts[i + 1].x) / 2;
+      const midY = (pts[i].y + pts[i + 1].y) / 2;
+      ctx.quadraticCurveTo(pts[i].x, pts[i].y, midX, midY);
+    }
+    const last = pts[pts.length - 1];
+    ctx.lineTo(last.x, last.y);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const redrawCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const targetWidth = Math.round(rect.width * dpr);
+    const targetHeight = Math.round(rect.height * dpr);
+    if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+
+    for (const stroke of strokesRef.current) {
+      drawStroke(ctx, stroke);
+    }
+    if (currentStrokeRef.current) {
+      drawStroke(ctx, currentStrokeRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    redrawCanvas();
+  }, [isExpanded, redrawCanvas]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver(() => {
+      redrawCanvas();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [redrawCanvas]);
+
+  const getRelativePoint = (e: React.PointerEvent<HTMLCanvasElement>): ScratchPoint => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const point = getRelativePoint(e);
+    isDrawingRef.current = true;
+    setIsWriting(true);
+    currentStrokeRef.current = {
+      mode: toolMode,
+      color: inkColor,
+      width: strokeWidth,
+      points: [point],
+    };
+    redrawCanvas();
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current || !currentStrokeRef.current) return;
+    const point = getRelativePoint(e);
+    const pts = currentStrokeRef.current.points;
+    const prev = pts[pts.length - 1];
+    if (prev) {
+      const dx = point.x - prev.x;
+      const dy = point.y - prev.y;
+      if (dx * dx + dy * dy < 2.25) return;
+    }
+    pts.push(point);
+    redrawCanvas();
+  };
+
+  const finishStroke = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current || !currentStrokeRef.current) return;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    strokesRef.current = [...strokesRef.current, currentStrokeRef.current];
+    currentStrokeRef.current = null;
+    isDrawingRef.current = false;
+    setIsWriting(false);
+    setStrokeCount(strokesRef.current.length);
+    redrawCanvas();
+  };
+
+  const handleUndo = () => {
+    if (strokesRef.current.length === 0) return;
+    strokesRef.current = strokesRef.current.slice(0, -1);
+    setStrokeCount(strokesRef.current.length);
+    redrawCanvas();
+  };
+
+  const handleClearPad = () => {
+    if (strokesRef.current.length === 0 && !currentStrokeRef.current) return;
+    strokesRef.current = [];
+    currentStrokeRef.current = null;
+    isDrawingRef.current = false;
+    setIsWriting(false);
+    setStrokeCount(0);
+    redrawCanvas();
+  };
+
+  return (
+    <div className="max-w-5xl rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white/85 dark:bg-slate-900/85 shadow-2xs overflow-hidden">
+      {/* Scratchpad Toolbar */}
+      <div className="px-3.5 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-stone-50/90 dark:bg-slate-900/95 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-md bg-blue-50 dark:bg-cyan-950/60 border border-blue-200 dark:border-cyan-800/70 flex items-center justify-center text-[#0b5394] dark:text-cyan-400">
+            <PenTool className="w-3.5 h-3.5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-tight">
+              Freehand Scratchpad &amp; Circuit Notes
+            </h4>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+              Write or sketch directly with your mouse cursor
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Pen / Eraser Mode */}
+          <div className="inline-flex rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 p-0.5">
+            <button
+              type="button"
+              onClick={() => setToolMode('pen')}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+                toolMode === 'pen'
+                  ? 'bg-[#0b5394] text-white dark:bg-cyan-600'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-800'
+              }`}
+              title="Pen tool"
+            >
+              <PenTool className="w-3 h-3" />
+              <span>Pen</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setToolMode('eraser')}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+                toolMode === 'eraser'
+                  ? 'bg-slate-800 text-white dark:bg-slate-600'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-800'
+              }`}
+              title="Eraser tool"
+            >
+              <Eraser className="w-3 h-3" />
+              <span>Eraser</span>
+            </button>
+          </div>
+
+          {/* Ink Color Swatches */}
+          <div className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950">
+            {SCRATCHPAD_COLORS.map((swatch) => {
+              const isSelected = inkColor === swatch.value && toolMode === 'pen';
+              return (
+                <button
+                  key={swatch.value}
+                  type="button"
+                  onClick={() => {
+                    setInkColor(swatch.value);
+                    setToolMode('pen');
+                  }}
+                  title={swatch.label}
+                  aria-label={swatch.label}
+                  className={`w-4 h-4 rounded-full transition-transform ${
+                    isSelected ? 'ring-2 ring-offset-1 ring-slate-900 dark:ring-white scale-110' : 'hover:scale-110 opacity-85 hover:opacity-100'
+                  }`}
+                  style={{ backgroundColor: swatch.value }}
+                />
+              );
+            })}
+          </div>
+
+          {/* Stroke Width */}
+          <div className="inline-flex rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 p-0.5">
+            {SCRATCHPAD_WIDTHS.map((w) => (
+              <button
+                key={w.label}
+                type="button"
+                onClick={() => setStrokeWidth(w.value)}
+                className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+                  strokeWidth === w.value
+                    ? 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                {w.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Undo / Clear / Expand */}
+          <div className="inline-flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleUndo}
+              disabled={strokeCount === 0}
+              title="Undo last stroke"
+              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-stone-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+            >
+              <Undo2 className="w-3 h-3" />
+              <span>Undo</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleClearPad}
+              disabled={strokeCount === 0}
+              title="Clear scratchpad"
+              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-[11px] font-semibold text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>Clear</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsExpanded((prev) => !prev)}
+              title={isExpanded ? 'Collapse height' : 'Expand height'}
+              className="inline-flex items-center justify-center p-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Drawing Surface */}
+      <div
+        ref={containerRef}
+        className="relative w-full transition-[height] duration-200 bg-white/90 dark:bg-slate-100/95"
+        style={{
+          height: isExpanded ? '420px' : '260px',
+          backgroundImage:
+            'linear-gradient(to right, rgba(59, 130, 246, 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(59, 130, 246, 0.08) 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
+        }}
+      >
+        {strokeCount === 0 && !isWriting && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center">
+            <span className="text-xs sm:text-sm font-medium text-slate-400 select-none">
+              Click and drag with your mouse cursor to write formulas, resistor values, or circuit notes...
+            </span>
+          </div>
+        )}
+        <canvas
+          ref={canvasRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={finishStroke}
+          onPointerCancel={finishStroke}
+          className={`block w-full h-full touch-none select-none ${
+            toolMode === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'
+          }`}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -630,6 +982,9 @@ export default function HardwareToolsView() {
               </div>
             </div>
           )}
+
+          {/* Freehand Mouse-Cursor Writing / Sketchpad Area */}
+          <FreehandScratchpad />
         </div>
       </section>
       )}

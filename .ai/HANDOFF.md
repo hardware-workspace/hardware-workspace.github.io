@@ -2,7 +2,9 @@
 
 ## Request and result
 
-Latest request: added the full Casio/mathda-style `<ScientificCalculator />` module (`src/ScientificCalculator.tsx`) as the second tool inside the Tools tab (`src/HardwareToolsView.tsx`), complete with mint/dark LCD tape display, `SHIFT`/`ALPHA`/4-way D-pad/scientific & numeric keypads, 2-arg functions, complex & polar math, fractions (`S⇔D`), `ENG`, `° ' ”`, `FACT`, `CONST`, `CONV`, `STO`/`RCL`, calculus (`deriv`, `integrate`, `sum`, `prod`), and numeric/analytical `SOLVE`.
+Latest request: added an interactive freehand mouse-cursor handwriting & sketchpad canvas (`<FreehandScratchpad />` in `src/HardwareToolsView.tsx`) directly underneath the Voltage Divider Calculator form, featuring quadratic midpoint stroke smoothing, high-DPI `devicePixelRatio` rendering, Pen/Eraser tools, 5 ink colors, 3 stroke widths (Fine/Med/Bold), Undo/Clear controls, and expandable engineering grid height.
+
+Previous: added the full Casio/mathda-style `<ScientificCalculator />` module (`src/ScientificCalculator.tsx`) as the second tool inside the Tools tab (`src/HardwareToolsView.tsx`), complete with mint/dark LCD tape display, `SHIFT`/`ALPHA`/4-way D-pad/scientific & numeric keypads, 2-arg functions, complex & polar math, fractions (`S⇔D`), `ENG`, `° ' ”`, `FACT`, `CONST`, `CONV`, `STO`/`RCL`, calculus (`deriv`, `integrate`, `sum`, `prod`), and numeric/analytical `SOLVE`.
 
 Previous: added a new "Tools" tab in `src/App.tsx` (desktop header & mobile bottom nav) with the Voltage Divider Calculator in `src/HardwareToolsView.tsx` supporting schematic display, Ω/kΩ/MΩ unit conversion, 4-way solving (`Vs`, `R1`, `R2`, `Vout`), orange target field indicator, and live circuit operating point stats.
 
