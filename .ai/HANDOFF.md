@@ -2,9 +2,9 @@
 
 ## Request and result
 
-Latest request: added a new "Tools" tab in `src/App.tsx` (desktop header & mobile bottom nav) with the Voltage Divider Calculator in `src/HardwareToolsView.tsx` supporting schematic display, Ω/kΩ/MΩ unit conversion, 4-way solving (`Vs`, `R1`, `R2`, `Vout`), orange target field indicator, and live circuit operating point stats.
+Latest request: added the full Casio/mathda-style `<ScientificCalculator />` module (`src/ScientificCalculator.tsx`) as the second tool inside the Tools tab (`src/HardwareToolsView.tsx`), complete with mint/dark LCD tape display, `SHIFT`/`ALPHA`/4-way D-pad/scientific & numeric keypads, 2-arg functions, complex & polar math, fractions (`S⇔D`), `ENG`, `° ' ”`, `FACT`, `CONST`, `CONV`, `STO`/`RCL`, calculus (`deriv`, `integrate`, `sum`, `prod`), and numeric/analytical `SOLVE`.
 
-Previous: fixed Gantt left column horizontal sticky positioning in `src/index.css` so `position: relative` on `.circuit-strip`, `.gantt-group-label`, and `> *` child stacking rules no longer override `.sticky` / `.absolute` on the sticky `Tasks` header, group rows, task rows, or column resize handle.
+Previous: added a new "Tools" tab in `src/App.tsx` (desktop header & mobile bottom nav) with the Voltage Divider Calculator in `src/HardwareToolsView.tsx` supporting schematic display, Ω/kΩ/MΩ unit conversion, 4-way solving (`Vs`, `R1`, `R2`, `Vout`), orange target field indicator, and live circuit operating point stats.
 
 Previous: replaced the repeated `header-circuit.jpg` background in the Sign-In left story panel (`src/AuthGate.tsx`, `src/auth.css`) with the looping video `src/assets/vid.mp4` (`<video className="auth-story-video" autoPlay loop muted playsInline />`) faded with a gradient mask and dark shade, while keeping `<CircuitElectricityOverlay />` layered on top.
 

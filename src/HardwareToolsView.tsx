@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Calculator, RotateCcw, Wrench, Zap } from 'lucide-react';
+import { Calculator, Cpu, Layers, RotateCcw, Wrench, Zap } from 'lucide-react';
 import SignalPulse from './SignalPulse';
+import ScientificCalculator from './ScientificCalculator';
 
 export type DividerField = 'vs' | 'r1' | 'r2' | 'vout';
 export type ResistanceUnit = 1 | 1000 | 1000000;
@@ -198,6 +199,7 @@ function VoltageDividerSchematic() {
 }
 
 export default function HardwareToolsView() {
+  const [activeTool, setActiveTool] = useState<'all' | 'voltage_divider' | 'scientific_calculator'>('all');
   const [vs, setVs] = useState('');
   const [r1, setR1] = useState('');
   const [r2, setR2] = useState('');
@@ -334,17 +336,34 @@ export default function HardwareToolsView() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 text-white text-xs font-semibold shadow-sm"
-          >
-            <Calculator className="w-3.5 h-3.5" />
-            <span>Voltage Divider Calculator</span>
-          </button>
+          {[
+            { id: 'all' as const, label: 'All Tools (2)', icon: Layers },
+            { id: 'voltage_divider' as const, label: '1. Voltage Divider Calculator', icon: Zap },
+            { id: 'scientific_calculator' as const, label: '2. Scientific Calculator', icon: Calculator },
+          ].map((tool) => {
+            const Icon = tool.icon;
+            const selected = activeTool === tool.id;
+            return (
+              <button
+                key={tool.id}
+                type="button"
+                onClick={() => setActiveTool(tool.id)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  selected
+                    ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-sm'
+                    : 'bg-slate-900/70 hover:bg-slate-800 text-cyan-100 border border-cyan-400/25'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tool.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Voltage Divider Calculator Card */}
+      {/* Tool 1: Voltage Divider Calculator Card */}
+      {(activeTool === 'all' || activeTool === 'voltage_divider') && (
       <section className="circuit-card rounded-2xl border border-stone-200 dark:border-slate-800 shadow-sm overflow-hidden bg-white dark:bg-slate-900">
         {/* Card Subheader */}
         <div className="px-5 py-3.5 border-b border-stone-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 bg-stone-50/80 dark:bg-slate-900/95">
@@ -613,6 +632,57 @@ export default function HardwareToolsView() {
           )}
         </div>
       </section>
+      )}
+
+      {/* Tool 2: Full Scientific Calculator Module */}
+      {(activeTool === 'all' || activeTool === 'scientific_calculator') && (
+      <section className="circuit-card rounded-2xl border border-stone-200 dark:border-slate-800 shadow-sm overflow-hidden bg-white dark:bg-slate-900">
+        <div className="px-5 py-3.5 border-b border-stone-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 bg-stone-50/80 dark:bg-slate-900/95">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              Scientific Calculator
+            </h3>
+          </div>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            Tools &gt; Scientific Calculator
+          </span>
+        </div>
+
+        <div className="p-4 sm:p-6 bg-stone-100/70 dark:bg-slate-950/80 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-6 flex justify-center">
+            <ScientificCalculator />
+          </div>
+
+          <div className="lg:col-span-6 space-y-3 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+            <div className="rounded-xl border border-stone-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-2.5">
+              <h4 className="font-bold text-slate-900 dark:text-slate-100">
+                Supported Modes &amp; Engineering Functions
+              </h4>
+              <ul className="space-y-1.5 text-xs leading-relaxed">
+                <li>
+                  <strong>Direct Math &amp; Equation Solver (<code className="text-indigo-600 dark:text-cyan-400">SOLVE</code>):</strong> Type equations like{' '}
+                  <code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">x² - 3x + 1 = 0</code> or{' '}
+                  <code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">cos(x) = x</code> and press <strong>=</strong> or <strong>SHIFT + CALC</strong>.
+                </li>
+                <li>
+                  <strong>Exact Fractions &amp; Engineering Notation:</strong> Press <strong>S⇔D</strong> to convert decimals to exact fractions (<code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">a/b</code> or mixed <code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">a b/c</code>), and press <strong>ENG</strong> to cycle SI powers of 10<sup>3</sup> (<code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">p, n, µ, m, k, M, G</code>).
+                </li>
+                <li>
+                  <strong>Calculus &amp; Discrete Math:</strong> Numerical definite integral{' '}
+                  <code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">integrate(x^2, 0, 3)</code>, derivative{' '}
+                  <code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">deriv(x^3, 2)</code>, <code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">sum()</code>, <code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">prod()</code>, <code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">nPr</code>/<code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">nCr</code>, <code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">GCD</code>/<code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">LCM</code>, and prime factorization (<strong>SHIFT + °&apos;”</strong>).
+                </li>
+                <li>
+                  <strong>Complex, Polar &amp; Hardware Constants:</strong> Use <code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">i</code> and phasor{' '}
+                  <code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">5∠30</code>, <code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">Pol(x,y)</code> / <code className="px-1 py-0.5 rounded bg-stone-100 dark:bg-slate-800">Rec(r,θ)</code>, physical constants (<strong>SHIFT + 7</strong>), unit conversions (<strong>SHIFT + 8</strong>), and variable registers <strong>A–Z / M</strong> (<strong>STO</strong> / <strong>RCL</strong>).
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+      )}
     </div>
   );
 }
