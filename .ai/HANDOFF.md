@@ -2,9 +2,9 @@
 
 ## Request and result
 
-Latest request: added a Cairo date and time stamp (`formatAuditTimestamp`) to each Activity Audit Log entry inside `TaskSidePanel` in `src/App.tsx`.
+Latest request: added a right-to-left dark blue gradient blended with circuit traces on `.circuit-strip` toolbars (`src/index.css`) while excluding the sticky `.gantt-main-scroll` header column, and updated right-side toolbar pill/helper-text contrast in `src/App.tsx`.
 
-Previous: replaced `src/assets/vid.mp4` with the user's `vid 2 .mp4` video for the Sign-In left story panel background (`src/AuthGate.tsx`, `src/auth.css`), keeping the gradient fade mask and `<CircuitElectricityOverlay />` layered on top.
+Previous: added a Cairo date and time stamp (`formatAuditTimestamp`) to each Activity Audit Log entry inside `TaskSidePanel` in `src/App.tsx`.
 
 Previous: replaced the repeated `header-circuit.jpg` background in the Sign-In left story panel (`src/AuthGate.tsx`, `src/auth.css`) with the looping video `src/assets/vid.mp4` (`<video className="auth-story-video" autoPlay loop muted playsInline />`) faded with a gradient mask and dark shade, while keeping `<CircuitElectricityOverlay />` layered on top.
 

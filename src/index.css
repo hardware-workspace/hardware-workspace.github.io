@@ -305,7 +305,7 @@ body:has(.group-drag-floating-card) * { cursor: grabbing !important; }
   z-index: 1;
 }
 
-/* Horizontal toolbar / filter strip with left-to-right circuit fade */
+/* Horizontal toolbar / filter strip with left-to-right circuit fade and right-to-left dark blue gradient */
 .circuit-strip {
   border-color: rgba(6, 182, 212, 0.24) !important;
   box-shadow: 0 2px 12px -2px rgba(6, 182, 212, 0.08);
@@ -329,6 +329,44 @@ body:has(.group-drag-floating-card) * { cursor: grabbing !important; }
 }
 .dark .circuit-strip::before {
   opacity: 0.24;
+}
+.circuit-strip::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: min(720px, 78%);
+  pointer-events: none;
+  background-image:
+    linear-gradient(
+      to left,
+      rgba(8, 20, 52, 0.92) 0%,
+      rgba(15, 35, 82, 0.80) 38%,
+      rgba(30, 58, 138, 0.42) 70%,
+      transparent 100%
+    ),
+    var(--circuit-img);
+  background-size: cover;
+  background-position: right center;
+  -webkit-mask-image: linear-gradient(
+    to left,
+    #000 0%,
+    #000 35%,
+    rgba(0, 0, 0, 0.65) 62%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to left,
+    #000 0%,
+    #000 35%,
+    rgba(0, 0, 0, 0.65) 62%,
+    transparent 100%
+  );
+}
+.dark .circuit-strip::after {
+  opacity: 0.95;
+}
+.gantt-main-scroll .circuit-strip::after {
+  display: none;
 }
 .circuit-strip > * {
   position: relative;

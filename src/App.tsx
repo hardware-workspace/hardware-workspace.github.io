@@ -2312,7 +2312,7 @@ export default function App({ account, onSignOut }) {
               <div className="flex items-center gap-2">
                 <button
                   onClick={clearAllFilters}
-                  className="px-2 py-1 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 border border-stone-200/80 dark:border-slate-700 shadow-2xs transition-colors"
                 >
                   Clear
                 </button>
@@ -3867,7 +3867,7 @@ function GanttView({
             <Minimize2 className="w-3.5 h-3.5 text-slate-500" />
             <span>{collapseLabel}</span>
           </button>
-          {onBulkStatusChange && <button type="button" className="rounded-lg border px-2 py-1" onClick={() => setCheckedTasks(checkedTasks.length ? [] : tasks.filter(task => canEditTask(task)).map(task => task.id))}>{checkedTasks.length ? 'Clear selection' : 'Select all filtered tasks'}</button>}
+          {onBulkStatusChange && <button type="button" className="rounded-lg border border-stone-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900 text-slate-700 dark:text-slate-200 px-2 py-1" onClick={() => setCheckedTasks(checkedTasks.length ? [] : tasks.filter(task => canEditTask(task)).map(task => task.id))}>{checkedTasks.length ? 'Clear selection' : 'Select all filtered tasks'}</button>}
           {onBulkStatusChange && checkedTasks.length > 0 && <div className="flex flex-wrap items-center gap-2">
             <select aria-label="Status for selected tasks" value={bulkStatus} onChange={event => setBulkStatus(event.target.value)} className="rounded-lg border px-2 py-1 dark:bg-slate-900">
               {Object.entries(STATUS_META).map(([status, meta]) => <option key={status} value={status}>{meta.label}</option>)}
@@ -3967,7 +3967,7 @@ function GanttView({
 
         {/* Right Controls: Daily Member Capacity Overlay + Alt+MouseWheel Zoom Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5 bg-indigo-50/80 dark:bg-indigo-950/50 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800">
+          <div className="flex items-center gap-1.5 bg-indigo-50/95 dark:bg-indigo-950/90 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800">
             <Gauge className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span className="font-semibold text-indigo-900 dark:text-indigo-200 text-[11px]">Daily Weight:</span>
             <select
@@ -5469,7 +5469,7 @@ function KanbanView({
             </button>
           ))}
         </div>
-        <span className="text-[11px] text-slate-400">
+        <span className="text-[11px] font-medium text-slate-100 dark:text-slate-300 [text-shadow:0_1px_2px_rgba(2,6,23,0.8)]">
           Swipe columns on mobile; open a task to change its status. Drag cards to reorder on desktop
         </span>
       </div>
