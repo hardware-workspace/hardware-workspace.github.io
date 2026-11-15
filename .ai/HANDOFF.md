@@ -2,7 +2,7 @@
 
 ## 15 November 2026 — Clock hierarchy
 
-Enlarged the Gantt time to 3xl/4xl and placed it above the smaller date, aligned right. The time retains the white-to-cyan gradient; Cairo formatting is unchanged. `npm run build` and diff check passed. Production publish and verification are pending. Next step: publish and verify live, then take the user's next request.
+Enlarged the Gantt time to 3xl/4xl and placed it above the smaller date, aligned right. The time retains the white-to-cyan gradient; Cairo formatting is unchanged. `npm run build` and diff check passed. Commit `b3d4eac` was pushed to `main`; `npm run deploy:verify` confirmed production serves it and its JavaScript entrypoint. Next step: take the user's next request.
 
 ## 15 November 2026 — Larger Gantt clock
 
