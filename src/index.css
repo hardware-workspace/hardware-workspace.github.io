@@ -392,6 +392,59 @@ body:has(.group-drag-floating-card) * { cursor: grabbing !important; }
   z-index: 1;
 }
 
+/* ── Animated logic-analyzer signal (replaces the static cyan dot) ── */
+.signal-pulse {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 14px;
+}
+.signal-pulse-svg {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 22%, #000 78%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 22%, #000 78%, transparent 100%);
+}
+.signal-pulse-grid {
+  stroke: rgba(103, 232, 249, 0.18);
+  stroke-width: 0.6;
+  stroke-dasharray: 1.5 1.5;
+}
+.signal-pulse-wave {
+  animation: signal-pulse-scroll 1.6s linear infinite;
+}
+.signal-pulse-wave path {
+  fill: none;
+  stroke: #67e8f9;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 2px rgba(103, 232, 249, 0.9));
+}
+.signal-pulse-probe {
+  position: absolute;
+  left: 50%;
+  top: 1px;
+  bottom: 1px;
+  width: 1px;
+  margin-left: -0.5px;
+  background: linear-gradient(to bottom, transparent, rgba(240, 253, 255, 0.95), transparent);
+  box-shadow: 0 0 4px rgba(103, 232, 249, 0.9);
+  animation: signal-pulse-blink 1.6s ease-in-out infinite;
+}
+@keyframes signal-pulse-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-26px); }
+}
+@keyframes signal-pulse-blink {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .signal-pulse-wave, .signal-pulse-probe { animation: none; }
+}
+
 /* Mobile bottom nav subtle circuit trace strip */
 .mobile-bottom-nav {
   position: relative;

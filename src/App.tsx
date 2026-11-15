@@ -1,5 +1,6 @@
 import { useSharedWorkspace } from './sharedWorkspace';
 import headerCircuitImage from './assets/header-circuit.jpg';
+import SignalPulse from './SignalPulse';
 import AccountSettings from './AccountSettings';
 import Dashboard from './Dashboard';
 import EmailPreferences from './EmailPreferences';
@@ -1954,7 +1955,7 @@ export default function App({ account, onSignOut }) {
                 <div>
                   <div className="flex items-center gap-1.5">
                     <h1 className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-slate-950/55 backdrop-blur-sm ring-1 ring-cyan-300/25 shadow-[0_0_12px_rgba(34,211,238,0.25)] px-2.5 py-1 font-extrabold text-sm sm:text-base tracking-tight">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_6px_rgba(103,232,249,0.9)] shrink-0" aria-hidden="true" />
+                      <SignalPulse />
                       <span className="bg-gradient-to-r from-white via-sky-100 to-cyan-300 bg-clip-text text-transparent">
                         CommTeam Task Manager
                       </span>
@@ -5646,7 +5647,7 @@ function TeamWorkloadView({ users, tasks, onSelectMember }) {
       <div className="circuit-banner rounded-2xl p-5 flex items-center justify-between">
         <div>
           <p className="uppercase tracking-widest text-xs text-cyan-300 font-semibold flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_6px_rgba(103,232,249,0.9)]" aria-hidden="true" />
+            <SignalPulse />
             Engineering capacity
           </p>
           <h2 className="text-xl sm:text-2xl font-extrabold mt-1.5 bg-gradient-to-r from-white via-sky-100 to-cyan-300 bg-clip-text text-transparent">
