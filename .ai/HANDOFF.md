@@ -1,5 +1,9 @@
 # Latest handoff
 
+## 15 November 2026 — Calculator layouts
+
+The scientific calculator now has three selectable layouts: Classic (ES-style), Explorer (EX-style), and Modern (CW-style). The scientific keys are reordered per layout, the latter two have direct engineering shortcuts, the calculator has larger keys and more room, and the selected layout persists locally. The existing math engine and computation state are shared across layouts. Changed `src/ScientificCalculator.tsx`, added `src/ScientificCalculator.css`, and widened its Tools panel in `src/HardwareToolsView.tsx`. `npm run check:focused` and `npm run build` passed. Publish/Pages verification and the final commit ID are pending as of this note. Next step: publish these files and verify the live Pages commit; then take the user's next request. Historical details below remain for reference.
+
 ## Request and result
 
 Latest request: removed the empty scratchpad hint, added pen and eraser cursors, and made Enter in the Vout input calculate Vout (`src/HardwareToolsView.tsx`). Build and live deployment must be verified against the latest commit.

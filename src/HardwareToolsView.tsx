@@ -1002,11 +1002,11 @@ export default function HardwareToolsView() {
         </div>
 
         <div className="p-4 sm:p-6 bg-stone-100/70 dark:bg-slate-950/80 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="lg:col-span-6 flex justify-center">
+          <div className="lg:col-span-7 flex justify-center">
             <ScientificCalculator />
           </div>
 
-          <div className="lg:col-span-6 space-y-3 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+          <div className="lg:col-span-5 space-y-3 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
             <div className="rounded-xl border border-stone-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-2.5">
               <h4 className="font-bold text-slate-900 dark:text-slate-100">
                 Supported Modes &amp; Engineering Functions

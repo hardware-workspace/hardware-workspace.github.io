@@ -1,4 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import './ScientificCalculator.css';
 import {
   ChevronDown,
   ChevronLeft,
@@ -15,6 +16,40 @@ import {
 export type AngleUnit = 'RAD' | 'DEG' | 'GRAD';
 export type DisplayFormat = 'DECI' | 'FRAC' | 'ENG' | 'SCI';
 type LcdTheme = 'mint' | 'dark' | 'paper';
+type CalculatorModel = 'classic' | 'explorer' | 'modern';
+
+const CALCULATOR_MODELS: Array<{ id: CalculatorModel; name: string; caption: string }> = [
+  { id: 'classic', name: 'Classic', caption: 'ES-style keypad' },
+  { id: 'explorer', name: 'Explorer', caption: 'EX-style layout' },
+  { id: 'modern', name: 'Modern', caption: 'CW-style layout' },
+];
+
+const SCIENTIFIC_KEYS = [
+  { action: 'frac', label: '□/□', shift: 'a b/c', alpha: '÷R' },
+  { action: 'sqrt', label: '√□', shift: '³√', alpha: '(□)' },
+  { action: 'sq', label: 'x²', shift: 'x³', alpha: 'mod' },
+  { action: 'pow', label: 'x^□', shift: 'ⁿ√', alpha: 'cot' },
+  { action: 'log10', label: 'log', shift: '10^□', alpha: 'cot⁻¹' },
+  { action: 'ln', label: 'ln', shift: 'e^□', alpha: 'T' },
+  { action: 'neg', label: '(−)', shift: '∠', alpha: 'A' },
+  { action: 'dms', label: '° \' ”', shift: 'FACT', alpha: 'B' },
+  { action: 'hyp', label: 'hyp', shift: 'Abs', alpha: 'C' },
+  { action: 'sin', label: 'sin', shift: 'sin⁻¹', alpha: 'D' },
+  { action: 'cos', label: 'cos', shift: 'cos⁻¹', alpha: 'Z' },
+  { action: 'tan', label: 'tan', shift: 'tan⁻¹', alpha: 'F' },
+  { action: 'rcl', label: 'RCL', shift: 'STO' },
+  { action: 'eng', label: 'ENG', shift: 'i', alpha: 'i' },
+  { action: 'lparen', label: '(', shift: '%' },
+  { action: 'rparen', label: ')', shift: ',', alpha: 'X' },
+  { action: 'sd', label: 'S⇔D', shift: 'a b/c⇔d/c', alpha: 'Y' },
+  { action: 'mplus', label: 'M+', shift: 'M−', alpha: 'M' },
+] as const;
+
+const SCIENTIFIC_KEY_ORDER: Record<CalculatorModel, string[]> = {
+  classic: ['frac', 'sqrt', 'sq', 'pow', 'log10', 'ln', 'neg', 'dms', 'hyp', 'sin', 'cos', 'tan', 'rcl', 'eng', 'lparen', 'rparen', 'sd', 'mplus'],
+  explorer: ['frac', 'sqrt', 'sq', 'pow', 'lparen', 'rparen', 'sin', 'cos', 'tan', 'log10', 'ln', 'sd', 'hyp', 'neg', 'dms', 'eng', 'rcl', 'mplus'],
+  modern: ['sq', 'sqrt', 'pow', 'frac', 'log10', 'ln', 'sin', 'cos', 'tan', 'hyp', 'lparen', 'rparen', 'sd', 'eng', 'neg', 'dms', 'rcl', 'mplus'],
+};
 
 interface Complex {
   re: number;
@@ -984,6 +1019,15 @@ function solveEquationReal(lhsNode: AstNode, rhsNode: AstNode, env: EvalEnv): nu
 // ============================================================================
 export default function ScientificCalculator() {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [calculatorModel, setCalculatorModel] = useState<CalculatorModel>(() => {
+    if (typeof window === 'undefined') return 'explorer';
+    const saved = window.localStorage.getItem('hardware-calculator-model');
+    return CALCULATOR_MODELS.some((model) => model.id === saved) ? saved as CalculatorModel : 'explorer';
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem('hardware-calculator-model', calculatorModel);
+  }, [calculatorModel]);
 
   const [expression, setExpression] = useState('');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -1641,11 +1685,34 @@ export default function ScientificCalculator() {
   const hasMemory = vars.M && (Math.abs(vars.M.re) > 1e-14 || Math.abs(vars.M.im) > 1e-14);
 
   return (
-    <div className="w-full flex flex-col items-center">
-      {/* Main Scientific Calculator Chassis (mathda.com Casio fx-style) */}
-      <div className="w-full max-w-[392px] rounded-2xl bg-[#222326] border-2 border-[#121316] shadow-[0_18px_45px_rgba(2,6,23,0.45)] p-3 text-white select-none">
+    <div className="w-full flex flex-col items-center gap-3">
+      <div className="w-full max-w-[500px] rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-700 dark:bg-slate-900" role="group" aria-label="Calculator layout">
+        <div className="grid grid-cols-3 gap-1">
+          {CALCULATOR_MODELS.map((model) => (
+            <button
+              key={model.id}
+              type="button"
+              onClick={() => setCalculatorModel(model.id)}
+              aria-pressed={calculatorModel === model.id}
+              title={model.caption}
+              className={`rounded-lg px-2 py-2 text-center transition-colors ${calculatorModel === model.id ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+            >
+              <span className="block text-xs font-bold">{model.name}</span>
+              <span className="block text-[10px] opacity-80">{model.caption}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className={`calculator-shell calculator-${calculatorModel} w-full max-w-[500px] rounded-2xl border-2 shadow-[0_18px_45px_rgba(2,6,23,0.25)] p-3.5 text-white select-none ${calculatorModel === 'classic' ? 'border-[#121316] bg-[#222326]' : calculatorModel === 'explorer' ? 'border-[#152744] bg-[#1d3455]' : 'border-[#364656] bg-[#41546a]'}`}>
+        <div className="mb-2.5 flex items-center justify-between px-1">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-200">Hardware Workspace</div>
+            <div className="text-xs font-semibold text-slate-100">Scientific Calculator · {CALCULATOR_MODELS.find((model) => model.id === calculatorModel)?.name}</div>
+          </div>
+          <div className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-bold tracking-wide text-slate-100">{modeDrawer === 'COMP' ? 'CALCULATE' : modeDrawer}</div>
+        </div>
         {/* LCD DISPLAY */}
-        <div className={`relative rounded-xl border ${lcdClass} min-h-[198px] flex flex-col justify-between p-2.5 shadow-inner transition-colors`}>
+        <div className={`relative rounded-xl border ${lcdClass} min-h-[198px] flex flex-col justify-between p-3 shadow-inner transition-colors`}>
           {/* Top editable math input + ⋮ menu */}
           <div className="flex items-start gap-1">
             <input
@@ -2014,6 +2081,23 @@ export default function ScientificCalculator() {
           </div>
         </div>
 
+        {calculatorModel !== 'classic' && (
+          <div className="mb-3 grid grid-cols-6 gap-1.5" aria-label="Quick functions">
+            {[
+              { label: 'π', action: () => insertAtCursor('π') },
+              { label: 'e', action: () => insertAtCursor('e') },
+              { label: 'i', action: () => insertAtCursor('i') },
+              { label: 'd/dx', action: () => insertAtCursor('deriv(, 1)', 4) },
+              { label: '∫', action: () => insertAtCursor('integrate(, 0, 1)', 7) },
+              { label: 'CONST', action: () => setConstOpen((open) => !open) },
+            ].map((shortcut) => (
+              <button key={shortcut.label} type="button" onClick={shortcut.action} className="calculator-quick-key rounded-md py-1.5 text-[11px] font-bold transition-colors">
+                {shortcut.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* TOP CONTROL ROW: SHIFT / ALPHA + OVAL D-PAD + MODE / SETUP */}
         <div className="grid grid-cols-6 gap-1.5 items-center mb-2">
           <div className="col-span-2 grid grid-cols-2 gap-1.5">
@@ -2093,32 +2177,24 @@ export default function ScientificCalculator() {
           </div>
         </div>
 
-        {/* SCIENTIFIC FUNCTION ROWS (Rows 2-5 matching screenshot) */}
         <div className="grid grid-cols-6 gap-x-1.5 gap-y-1.5 mb-2.5">
-          <CalcSciButton shift="a b/c" alpha="÷R" label="□/□" onClick={() => handleKeyPress('frac')} />
-          <CalcSciButton shift="³√" alpha="(□)" label="√□" onClick={() => handleKeyPress('sqrt')} />
-          <CalcSciButton shift="x³" alpha="mod" label="x²" onClick={() => handleKeyPress('sq')} />
-          <CalcSciButton shift="ⁿ√" alpha="cot" label="x^□" onClick={() => handleKeyPress('pow')} />
-          <CalcSciButton shift="10^□" alpha="cot⁻¹" label="log" onClick={() => handleKeyPress('log10')} />
-          <CalcSciButton shift="e^□" alpha="T" label="ln" onClick={() => handleKeyPress('ln')} />
-
-          <CalcSciButton shift="∠" alpha="A" label="(−)" onClick={() => handleKeyPress('neg')} />
-          <CalcSciButton shift="FACT" alpha="B" label="° ' ”" onClick={() => handleKeyPress('dms')} />
-          <CalcSciButton shift="Abs" alpha="C" label="hyp" onClick={() => handleKeyPress('hyp')} active={hypActive} />
-          <CalcSciButton shift="sin⁻¹" alpha="D" label="sin" onClick={() => handleKeyPress('sin')} />
-          <CalcSciButton shift="cos⁻¹" alpha="Z" label="cos" onClick={() => handleKeyPress('cos')} />
-          <CalcSciButton shift="tan⁻¹" alpha="F" label="tan" onClick={() => handleKeyPress('tan')} />
-
-          <CalcSciButton shift="STO" label="RCL" onClick={() => handleKeyPress('rcl')} active={stoPending || rclOpen} />
-          <CalcSciButton shift="i" alpha="i" label="ENG" onClick={() => handleKeyPress('eng')} />
-          <CalcSciButton shift="%" label="(" onClick={() => handleKeyPress('lparen')} />
-          <CalcSciButton shift="," alpha="X" label=")" onClick={() => handleKeyPress('rparen')} />
-          <CalcSciButton shift="a b/c⇔d/c" alpha="Y" label="S⇔D" onClick={() => handleKeyPress('sd')} />
-          <CalcSciButton shift="M−" alpha="M" label="M+" onClick={() => handleKeyPress('mplus')} />
+          {SCIENTIFIC_KEY_ORDER[calculatorModel].map((action) => {
+            const key = SCIENTIFIC_KEYS.find((item) => item.action === action)!;
+            return (
+              <CalcSciButton
+                key={action}
+                label={key.label}
+                shift={key.shift}
+                alpha={'alpha' in key ? key.alpha : undefined}
+                active={action === 'hyp' ? hypActive : action === 'rcl' ? stoPending || rclOpen : false}
+                onClick={() => handleKeyPress(action)}
+              />
+            );
+          })}
         </div>
 
         {/* MAIN NUMERIC & OPERATOR KEYPAD (5 columns x 4 rows matching screenshot) */}
-        <div className="grid grid-cols-5 gap-x-1.5 gap-y-2">
+        <div className="calculator-keypad grid grid-cols-5 gap-x-1.5 gap-y-2">
           <CalcNumButton shift="CONST" label="7" onClick={() => handleKeyPress('7')} />
           <CalcNumButton shift="CONV" label="8" onClick={() => handleKeyPress('8')} />
           <CalcNumButton shift="CLR" alpha="∞" label="9" onClick={() => handleKeyPress('9')} />
@@ -2170,7 +2246,7 @@ function CalcSciButton({
       <button
         type="button"
         onClick={onClick}
-        className={`h-8 rounded-md text-[12px] font-semibold shadow-xs transition-colors ${
+        className={`calculator-sci-key h-9 rounded-md text-[12px] font-semibold shadow-xs transition-colors ${
           active
             ? 'bg-cyan-600 text-white ring-1 ring-cyan-300'
             : 'bg-[#383a41] hover:bg-[#494c55] active:bg-[#2d2f35] text-white'
@@ -2206,7 +2282,7 @@ function CalcNumButton({
       <button
         type="button"
         onClick={onClick}
-        className={`h-10 rounded-lg font-bold shadow transition-colors ${
+        className={`calculator-num-key h-11 rounded-lg font-bold shadow transition-colors ${
           smallLabel ? 'text-[13px]' : 'text-[17px]'
         } ${
           variant === 'green'
