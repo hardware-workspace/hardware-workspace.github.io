@@ -3,6 +3,9 @@ import { Calculator, Cpu, Eraser, Layers, Maximize2, Minimize2, PenTool, RotateC
 import SignalPulse from './SignalPulse';
 import ScientificCalculator from './ScientificCalculator';
 
+const PEN_CURSOR = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M3 27 7 17 22 2l8 8-15 15z" fill="#f7d68a" stroke="#172033" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 17 22 2l8 8-15 15z" fill="#2563eb" stroke="#172033" stroke-width="1.5" stroke-linejoin="round"/><path d="m3 27 4-10 6 6z" fill="#fff4dc" stroke="#172033" stroke-width="1.5"/><path d="m3 27 2-5 3 3z" fill="#172033"/></svg>')}`;
+const ERASER_CURSOR = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M3 23 19 4q2-2 4 0l6 6q2 2 0 4L14 29H8z" fill="#f9a8d4" stroke="#172033" stroke-width="1.5" stroke-linejoin="round"/><path d="m8 17 9 9-3 3H8l-5-6z" fill="#e2e8f0" stroke="#172033" stroke-width="1.5"/></svg>')}`;
+
 export type DividerField = 'vs' | 'r1' | 'r2' | 'vout';
 export type ResistanceUnit = 1 | 1000 | 1000000;
 
@@ -238,7 +241,6 @@ function FreehandScratchpad() {
   const [inkColor, setInkColor] = useState<string>(SCRATCHPAD_COLORS[0].value);
   const [strokeWidth, setStrokeWidth] = useState<number>(SCRATCHPAD_WIDTHS[1].value);
   const [strokeCount, setStrokeCount] = useState(0);
-  const [isWriting, setIsWriting] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
   const drawStroke = (ctx: CanvasRenderingContext2D, stroke: ScratchStroke) => {
@@ -339,7 +341,6 @@ function FreehandScratchpad() {
     e.currentTarget.setPointerCapture(e.pointerId);
     const point = getRelativePoint(e);
     isDrawingRef.current = true;
-    setIsWriting(true);
     currentStrokeRef.current = {
       mode: toolMode,
       color: inkColor,
@@ -371,7 +372,6 @@ function FreehandScratchpad() {
     strokesRef.current = [...strokesRef.current, currentStrokeRef.current];
     currentStrokeRef.current = null;
     isDrawingRef.current = false;
-    setIsWriting(false);
     setStrokeCount(strokesRef.current.length);
     redrawCanvas();
   };
@@ -388,7 +388,6 @@ function FreehandScratchpad() {
     strokesRef.current = [];
     currentStrokeRef.current = null;
     isDrawingRef.current = false;
-    setIsWriting(false);
     setStrokeCount(0);
     redrawCanvas();
   };
@@ -528,22 +527,14 @@ function FreehandScratchpad() {
           backgroundSize: '20px 20px',
         }}
       >
-        {strokeCount === 0 && !isWriting && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center">
-            <span className="text-xs sm:text-sm font-medium text-slate-400 select-none">
-              Click and drag with your mouse cursor to write formulas, resistor values, or circuit notes...
-            </span>
-          </div>
-        )}
         <canvas
           ref={canvasRef}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={finishStroke}
           onPointerCancel={finishStroke}
-          className={`block w-full h-full touch-none select-none ${
-            toolMode === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'
-          }`}
+          className="block w-full h-full touch-none select-none"
+          style={{ cursor: toolMode === 'eraser' ? `url("${ERASER_CURSOR}") 4 23, auto` : `url("${PEN_CURSOR}") 3 27, auto` }}
         />
       </div>
     </div>
@@ -903,6 +894,12 @@ export default function HardwareToolsView() {
                     inputMode="decimal"
                     value={vout}
                     onChange={(e) => updateFieldValue('vout', e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        applyCalculation('vout');
+                      }
+                    }}
                     placeholder="output voltage"
                     className={inputClass('vout')}
                   />

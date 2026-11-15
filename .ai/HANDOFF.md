@@ -2,7 +2,9 @@
 
 ## Request and result
 
-Latest request: added an interactive freehand mouse-cursor handwriting & sketchpad canvas (`<FreehandScratchpad />` in `src/HardwareToolsView.tsx`) directly underneath the Voltage Divider Calculator form, featuring quadratic midpoint stroke smoothing, high-DPI `devicePixelRatio` rendering, Pen/Eraser tools, 5 ink colors, 3 stroke widths (Fine/Med/Bold), Undo/Clear controls, and expandable engineering grid height.
+Latest request: removed the empty scratchpad hint, added pen and eraser cursors, and made Enter in the Vout input calculate Vout (`src/HardwareToolsView.tsx`). Build and live deployment must be verified against the latest commit.
+
+Previous: added an interactive freehand sketchpad under the Voltage Divider Calculator with Pen/Eraser tools, ink colors, stroke widths, Undo/Clear, and expandable grid height.
 
 Previous: added the full Casio/mathda-style `<ScientificCalculator />` module (`src/ScientificCalculator.tsx`) as the second tool inside the Tools tab (`src/HardwareToolsView.tsx`), complete with mint/dark LCD tape display, `SHIFT`/`ALPHA`/4-way D-pad/scientific & numeric keypads, 2-arg functions, complex & polar math, fractions (`S⇔D`), `ENG`, `° ' ”`, `FACT`, `CONST`, `CONV`, `STO`/`RCL`, calculus (`deriv`, `integrate`, `sum`, `prod`), and numeric/analytical `SOLVE`.
 
