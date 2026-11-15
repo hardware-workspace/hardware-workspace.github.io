@@ -3126,6 +3126,32 @@ export default function App({ account, onSignOut }) {
 // 1. GANTT CHART VIEW (Fixed Column Clipping, Sticky Bottom Scrollbar, Alt+Wheel Zoom,
 //    Period Filter by Week/Month/Quarter/Year/Custom, Editable Gantt Dependencies & Blocked Segment)
 // ============================================================================
+function GanttClock() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const date = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Cairo', day: '2-digit', month: '2-digit', year: 'numeric',
+  }).format(now);
+  const time = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
+  }).format(now);
+
+  return (
+    <time dateTime={now.toISOString()} title="Current date and time in Cairo" aria-label={`Cairo date and time: ${date}, ${time}`}
+      className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-cyan-300/60 bg-white/90 px-2.5 py-1 font-mono text-[11px] font-semibold tabular-nums text-slate-700 shadow-sm dark:border-cyan-700 dark:bg-slate-900/90 dark:text-slate-200">
+      <Clock className="h-3.5 w-3.5 text-cyan-700 dark:text-cyan-300" aria-hidden="true" />
+      <span>{date}</span>
+      <span className="text-slate-400" aria-hidden="true">·</span>
+      <span>{time}</span>
+    </time>
+  );
+}
+
 function GanttView({
   controlsVisible,
   ganttExpanded = false,
@@ -4047,6 +4073,7 @@ function GanttView({
             ))}
           </div>
         </div>
+        <GanttClock />
       </div>
 
       </>}

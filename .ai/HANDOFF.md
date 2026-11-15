@@ -1,5 +1,9 @@
 # Latest handoff
 
+## 15 November 2026 — Gantt date and time
+
+Added a live Cairo date/time readout to the Gantt controls, formatted day/month/year and 12-hour time with seconds and AM/PM. It updates once per second within its own component and cleans up its timer. `npm run build` passed; a fixed-time check produced `15/11/2026 03:04:05 PM`. Production publish and live verification are pending. Next step: publish, verify the live commit, then take the user's next request.
+
 ## 15 November 2026 — Calculator layouts
 
 The scientific calculator now has three selectable layouts: Classic (ES-style), Explorer (EX-style), and Modern (CW-style). The scientific keys are reordered per layout, the latter two have direct engineering shortcuts, the calculator has larger keys and more room, and the selected layout persists locally. The existing math engine and computation state are shared across layouts. Changed `src/ScientificCalculator.tsx`, added `src/ScientificCalculator.css`, and widened its Tools panel in `src/HardwareToolsView.tsx`. `npm run check:focused` and `npm run build` passed. Commit `1e487b1` was pushed to `main`; `npm run deploy:verify` confirmed production serves that commit and its JavaScript entrypoint. Next step: take the user's next request. Historical details below remain for reference.
