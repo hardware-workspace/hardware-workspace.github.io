@@ -2,7 +2,7 @@
 
 ## 15 November 2026 — Gantt date and time
 
-Added a live Cairo date/time readout to the Gantt controls, formatted day/month/year and 12-hour time with seconds and AM/PM. It updates once per second within its own component and cleans up its timer. `npm run build` passed; a fixed-time check produced `15/11/2026 03:04:05 PM`. Production publish and live verification are pending. Next step: publish, verify the live commit, then take the user's next request.
+Added a live Cairo date/time readout to the Gantt controls, formatted day/month/year and 12-hour time with seconds and AM/PM. It updates once per second within its own component and cleans up its timer. `npm run build` passed; a fixed-time check produced `15/11/2026 03:04:05 PM`. Commit `3ef2658` was pushed to `main`, and `npm run deploy:verify` confirmed production serves it and its JavaScript entrypoint. Next step: take the user's next request.
 
 ## 15 November 2026 — Calculator layouts
 
