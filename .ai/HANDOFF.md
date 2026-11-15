@@ -2,7 +2,9 @@
 
 ## Request and result
 
-Latest request: added a live animated PCB circuit-trace electricity overlay (`<CircuitElectricityOverlay />` in `src/CircuitElectricityOverlay.tsx`, styled in `src/auth.css`) to the Sign-In left story panel (`src/AuthGate.tsx`) with glowing cyan electricity surges racing along 45-degree PCB traces, pulsing solder vias, and fixed background image scaling (`background-size: 380px auto`) so the circuit backdrop stays sharp on tall screens.
+Latest request: replaced the repeated `header-circuit.jpg` background in the Sign-In left story panel (`src/AuthGate.tsx`, `src/auth.css`) with the looping video `src/assets/vid.mp4` (`<video className="auth-story-video" autoPlay loop muted playsInline />`) faded with a gradient mask and dark shade, while keeping `<CircuitElectricityOverlay />` layered on top.
+
+Previous: added a live animated PCB circuit-trace electricity overlay (`<CircuitElectricityOverlay />` in `src/CircuitElectricityOverlay.tsx`, styled in `src/auth.css`) to the Sign-In left story panel (`src/AuthGate.tsx`) with glowing cyan electricity surges racing along 45-degree PCB traces, pulsing solder vias, and fixed background image scaling (`background-size: 380px auto`) so the circuit backdrop stays sharp on tall screens.
 
 Previous: replaced the static glowing cyan dot in the header badge and section banners with `<SignalPulse />` (`src/SignalPulse.tsx`, styled in `src/index.css`), an animated hardware logic-analyzer / oscilloscope digital square-wave trace scrolling across a dashed reference grid with a pulsing sample probe. Applied in `src/App.tsx`, `src/Dashboard.tsx`, `src/AccountSettings.tsx`, `src/AdminPage.tsx`, and `src/AuthGate.tsx` (`src/auth.css`).
 
