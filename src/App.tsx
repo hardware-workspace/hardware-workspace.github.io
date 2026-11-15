@@ -1938,6 +1938,15 @@ export default function App({ account, onSignOut }) {
               maskImage: 'linear-gradient(to right, #000 0%, #000 35%, transparent 100%)',
             }}
           />
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-y-0 right-0 w-[260px] max-w-[35%] bg-cover bg-right opacity-45 dark:opacity-65 -scale-x-100"
+                      style={{
+                        backgroundImage: `linear-gradient(90deg, rgba(2,6,23,0.55) 0%, rgba(15,23,42,0.2) 60%, transparent 100%), url(${headerCircuitImage})`,
+                        WebkitMaskImage: 'linear-gradient(to right, #000 0%, rgba(0,0,0,0.4) 45%, transparent 100%)',
+                        maskImage: 'linear-gradient(to right, #000 0%, rgba(0,0,0,0.4) 45%, transparent 100%)',
+                      }}
+                    />
           <div className="relative flex flex-col sm:flex-row items-center justify-between gap-2.5">
             {/* Brand & Main Navigation Tabs */}
             <div className="flex items-center justify-between w-full sm:w-auto gap-4">
@@ -1956,7 +1965,7 @@ export default function App({ account, onSignOut }) {
               </div>
 
               {/* Mobile menu toggle or compact nav */}
-              <nav aria-label="Workspace navigation" className="hidden md:flex items-center gap-1 bg-stone-100 dark:bg-slate-800/90 p-1 rounded-xl overflow-x-auto max-w-full">
+              <nav aria-label="Workspace navigation" className="hidden md:flex items-center gap-1 bg-stone-100/90 dark:bg-slate-800/90 ring-1 ring-cyan-500/20 p-1 rounded-xl overflow-x-auto max-w-full">
                 {[
                   { id: 'dashboard', label: 'Dashboard', icon: Activity },
                   { id: 'gantt', label: 'Gantt', icon: Calendar },
@@ -1972,8 +1981,8 @@ export default function App({ account, onSignOut }) {
                       onClick={() => setActiveTab(item.id)}
                       className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 ${
                         active
-                          ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                          ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5 shrink-0" />
@@ -1987,7 +1996,7 @@ export default function App({ account, onSignOut }) {
               {workspace.ready && (
                 <div
                   aria-label="Task counts"
-                  className="inline-flex items-center gap-0.5 rounded-lg bg-stone-100 dark:bg-slate-800/90 px-2 py-1 text-[11px] font-bold shrink-0"
+                  className="inline-flex items-center gap-0.5 rounded-lg bg-stone-100/90 dark:bg-slate-800/90 ring-1 ring-cyan-500/20 px-2 py-1 text-[11px] font-bold shrink-0"
                 >
                   {kpiStats.map((k, idx) => (
                     <React.Fragment key={k.id}>
@@ -2072,7 +2081,7 @@ export default function App({ account, onSignOut }) {
                 </button>
 
                 {notifOpen && (
-                  <div className="notification-popover absolute right-0 mt-2 w-80 sm:w-96 max-h-[28rem] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-stone-200 dark:border-slate-800 p-4 z-50">
+                  <div className="notification-popover circuit-card absolute right-0 mt-2 w-80 sm:w-96 max-h-[28rem] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-stone-200 dark:border-slate-800 p-4 z-50">
                     <div className="flex items-center justify-between pb-3 border-b border-stone-100 dark:border-slate-800">
                       <div>
                         <h3 className="font-semibold text-sm">Notifications ({currentUser.name})</h3>
@@ -2145,9 +2154,9 @@ export default function App({ account, onSignOut }) {
         </div>}
         {workspace.ready && (activeTab === 'kanban' || (activeTab === 'gantt' && ganttControls && !ganttExpanded)) && (
           <div className="workspace-filters shrink-0 px-3 lg:px-6 pt-2 space-y-2">
-            <button aria-expanded={mobileFiltersOpen} onClick={()=>setMobileFiltersOpen(!mobileFiltersOpen)} className="md:hidden w-full flex items-center justify-between bg-white dark:bg-slate-900 border rounded-lg px-3 py-2 text-sm"><span className="flex items-center gap-2"><Filter size={16}/>Search & filters</span>{mobileFiltersOpen?'Hide':'Show'}</button>
+            <button aria-expanded={mobileFiltersOpen} onClick={()=>setMobileFiltersOpen(!mobileFiltersOpen)} className="md:hidden w-full flex items-center justify-between circuit-strip bg-white dark:bg-slate-900 border rounded-lg px-3 py-2 text-sm"><span className="flex items-center gap-2"><Filter size={16}/>Search & filters</span>{mobileFiltersOpen?'Hide':'Show'}</button>
             {/* Persistent Filter Toolbar */}
-            <div className={`${mobileFiltersOpen ? 'flex' : 'hidden'} md:flex mobile-filter-toolbar bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-stone-200 dark:border-slate-800 shadow-xs flex-wrap items-center justify-between gap-2`}>
+            <div className={`${mobileFiltersOpen ? 'flex' : 'hidden'} md:flex mobile-filter-toolbar circuit-strip bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs px-3 py-2 rounded-xl border border-stone-200 dark:border-slate-800 shadow-xs flex-wrap items-center justify-between gap-2`}>
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 flex-1">
                 {/* Search Box */}
                 <div className="relative min-w-[150px] sm:min-w-[200px] flex-1 max-w-xs">
@@ -3678,7 +3687,7 @@ function GanttView({
         </div>
       )}
       {!controlsVisible && onToggleGanttFocus && (
-        <div className="flex flex-wrap items-center justify-between gap-1.5 shrink-0 bg-white dark:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-stone-200 dark:border-slate-800 shadow-xs text-xs">
+        <div className="circuit-strip flex flex-wrap items-center justify-between gap-1.5 shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-stone-200 dark:border-slate-800 shadow-xs text-xs">
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
@@ -3812,7 +3821,7 @@ function GanttView({
         <button aria-expanded={timelineOptionsOpen} onClick={()=>setTimelineOptionsOpen(!timelineOptionsOpen)} className="flex-1 flex justify-between border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900"><span>Timeline options</span><span>{timelineOptionsOpen?'Hide':'Show'}</span></button>
       </div>
       {/* Top Gantt Controls Bar: Expand/Collapse + Comprehensive Period Filter (Week, Month, Quarter, Year, Custom) + Alt+Wheel Zoom */}
-      <div className={`${timelineOptionsOpen ? 'flex' : 'hidden'} md:flex gantt-options shrink-0 bg-white dark:bg-slate-900 px-3.5 py-2 rounded-xl border border-stone-200 dark:border-slate-800 shadow-sm flex-wrap items-center justify-between gap-2 text-xs`}>
+      <div className={`${timelineOptionsOpen ? 'flex' : 'hidden'} md:flex gantt-options circuit-strip shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-stone-200 dark:border-slate-800 shadow-sm flex-wrap items-center justify-between gap-2 text-xs`}>
         <div className="flex flex-wrap items-center gap-1.5">
           {onToggleGanttFocus && (
             <button
@@ -4021,7 +4030,7 @@ function GanttView({
       <div
         ref={panelRef}
         style={panelHeight == null || compactTimeline ? undefined : { flex: `0 1 ${panelHeight}px` }}
-        className="bg-white dark:bg-slate-900 rounded-2xl border border-stone-200 dark:border-slate-800 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col"
+        className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-2xl border border-cyan-500/25 dark:border-cyan-400/25 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col"
       >
         <div
           ref={ganttScrollRef}
@@ -4043,7 +4052,7 @@ function GanttView({
             <div className="flex sticky top-0 z-40 bg-stone-100 dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 shadow-xs h-16">
               <div
                 style={{ width: `${leftColWidth}px` }}
-                className="shrink-0 sticky left-0 z-50 bg-stone-100 dark:bg-slate-800 px-4 py-2 font-bold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-300 border-r-2 border-stone-300 dark:border-slate-700 flex items-center justify-between shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
+                className="circuit-strip shrink-0 sticky left-0 z-50 bg-stone-100 dark:bg-slate-800 px-4 py-2 font-bold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-300 border-r-2 border-stone-300 dark:border-slate-700 flex items-center justify-between shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
               >
                 <span>Tasks</span>
                 <span className="hidden md:inline text-[10px] normal-case tracking-normal font-medium text-slate-500 dark:text-slate-400 max-w-[230px] text-right">
@@ -4819,11 +4828,11 @@ function TaskSidePanel({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="task-detail-sheet w-full sm:w-[500px] bg-white dark:bg-slate-900 h-full shadow-2xl border-l border-stone-200 dark:border-slate-800 flex flex-col justify-between overflow-y-auto cursor-default"
+        className="task-detail-sheet w-full sm:w-[500px] bg-white dark:bg-slate-900 h-full shadow-2xl border-l border-cyan-500/25 dark:border-cyan-400/25 flex flex-col justify-between overflow-y-auto cursor-default"
       >
         <div className="p-5 space-y-5">
           {/* 1. Header */}
-          <div className="space-y-3 border-b border-stone-200 dark:border-slate-800 pb-4">
+          <div className="circuit-drawer-header rounded-xl p-3 -mx-1 space-y-3 border-b border-stone-200 dark:border-slate-800 pb-4">
             <div className="flex items-start justify-between gap-2">
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${STATUS_META[task.status].bg} ${STATUS_META[task.status].text} ${STATUS_META[task.status].border}`}>
@@ -5412,7 +5421,7 @@ function KanbanView({
   return (
     <div className="space-y-3">
       {/* Kanban Sorting Bar */}
-      <div className="kanban-toolbar bg-white dark:bg-slate-900 px-4 py-2.5 rounded-2xl border border-stone-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div className="kanban-toolbar circuit-strip bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs px-4 py-2.5 rounded-2xl border border-stone-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2">
           <ArrowUpDown className="w-4 h-4 text-indigo-600" />
           <span className="font-bold text-slate-700 dark:text-slate-200">Sort Kanban Cards By:</span>
@@ -5465,10 +5474,10 @@ function KanbanView({
                   setDraggedTaskId(null);
                 }
               }}
-              className={`rounded-2xl p-3.5 border transition-all duration-200 flex flex-col max-h-[680px] ${
+              className={`circuit-card rounded-2xl p-3.5 border transition-all duration-200 flex flex-col max-h-[680px] ${
                 isOver
                   ? 'bg-indigo-50/90 dark:bg-indigo-950/50 border-indigo-400 ring-2 ring-indigo-400 scale-[1.01]'
-                  : 'bg-stone-100/80 dark:bg-slate-900/70 border-stone-200 dark:border-slate-800'
+                  : 'bg-stone-100/85 dark:bg-slate-900/80 border-stone-200 dark:border-slate-800'
               }`}
             >
               <div className="flex items-center justify-between mb-3 px-1">
@@ -5634,12 +5643,16 @@ function TeamWorkloadView({ users, tasks, onSelectMember }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="circuit-banner rounded-2xl p-5 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+          <p className="uppercase tracking-widest text-xs text-cyan-300 font-semibold flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_6px_rgba(103,232,249,0.9)]" aria-hidden="true" />
+            Engineering capacity
+          </p>
+          <h2 className="text-xl sm:text-2xl font-extrabold mt-1.5 bg-gradient-to-r from-white via-sky-100 to-cyan-300 bg-clip-text text-transparent">
             Team Workload & Daily Weight Capacity (Max 10 / Day)
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-300 mt-1">
             Click any team member card to jump to the Gantt chart filtered to their assigned tasks.
           </p>
         </div>
@@ -5674,7 +5687,7 @@ function TeamWorkloadView({ users, tasks, onSelectMember }) {
             <div
               key={member.id}
               onClick={() => onSelectMember(member.id)}
-              className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-stone-200 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-indigo-400 transition-all cursor-pointer space-y-4"
+              className="circuit-card bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-2xl p-5 border border-stone-200 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-cyan-400 transition-all cursor-pointer space-y-4"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -5768,7 +5781,7 @@ function SettingsView({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-slate-900 p-2 rounded-2xl border border-stone-200 dark:border-slate-800">
+      <div className="circuit-strip flex flex-wrap items-center gap-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs p-2 rounded-2xl border border-stone-200 dark:border-slate-800">
         {[
           { id: 'import', label: '1. Excel Import (17 Rules)', icon: FileSpreadsheet },
           { id: 'lines', label: '2. Projects & Products (Drag to Reorder)', icon: Layers },
@@ -5782,7 +5795,7 @@ function SettingsView({
               onClick={() => setSubTab(t.id)}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
                 subTab === t.id
-                  ? 'bg-indigo-600 text-white shadow-xs'
+                  ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-stone-100 dark:hover:bg-slate-800'
               }`}
             >
@@ -5794,7 +5807,7 @@ function SettingsView({
       </div>
 
       {subTab === 'import' && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-stone-200 dark:border-slate-800 space-y-5">
+        <div className="circuit-card bg-white/95 dark:bg-slate-900/95 p-6 rounded-2xl border border-stone-200 dark:border-slate-800 space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h3 className="text-base font-bold">Excel Workbook Importer (`Communication_TeaM_Test_updated.xlsx`)</h3>
@@ -5816,7 +5829,7 @@ function SettingsView({
       )}
 
       {subTab === 'lines' && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-stone-200 dark:border-slate-800 space-y-4">
+        <div className="circuit-card bg-white/95 dark:bg-slate-900/95 p-6 rounded-2xl border border-stone-200 dark:border-slate-800 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-base">Projects & Products Hierarchy</h3>
@@ -5868,7 +5881,7 @@ function SettingsView({
                     });
                     setDraggedPlId(null);
                   }}
-                  className="p-4 rounded-xl bg-stone-50 dark:bg-slate-800/60 border border-stone-200 dark:border-slate-800 space-y-2 cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01]"
+                  className="circuit-card p-4 rounded-xl bg-stone-50 dark:bg-slate-800/60 border border-stone-200 dark:border-slate-800 space-y-2 cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01]"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-indigo-950 dark:text-indigo-200">
@@ -5909,7 +5922,7 @@ function SettingsView({
       )}
 
       {subTab === 'users' && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-stone-200 dark:border-slate-800 space-y-4">
+        <div className="circuit-card bg-white/95 dark:bg-slate-900/95 p-6 rounded-2xl border border-stone-200 dark:border-slate-800 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-bold text-base">Team Members & Role Management</h3>
             <div className="flex flex-wrap gap-2">
@@ -6031,7 +6044,7 @@ function CreateProjectProductModal({ initialProjectId, productLines, onClose, on
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
+        className="circuit-modal-header bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -6166,7 +6179,7 @@ function NewTaskModal({ initialProjectId, initialProductId, productLines, projec
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
+        className="circuit-modal-header bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
       >
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-lg">Create Hardware Engineering Task</h3>
@@ -6420,7 +6433,7 @@ function SplitTaskModal({ task, users, onClose, onSplit }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
+        className="circuit-modal-header bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
@@ -6539,7 +6552,7 @@ function DryRunImportModal({ report, onClose, onConfirmImport }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
+        className="circuit-modal-header bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 shadow-2xl border border-stone-200 dark:border-slate-800 space-y-4"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">

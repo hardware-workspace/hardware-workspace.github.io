@@ -154,3 +154,265 @@ button:focus-visible, a:focus-visible { outline: 2px solid #6366f1; outline-offs
 /* While any group drag is active, override cursor globally */
 body:has(.group-drag-floating-card) { cursor: grabbing !important; }
 body:has(.group-drag-floating-card) * { cursor: grabbing !important; }
+
+/* ── Circuit-Trace Hardware Theme & Fading Gradient Accents ── */
+:root {
+  --circuit-img: url('./assets/header-circuit.jpg');
+}
+
+/* Base workspace shell ambient circuit glow & corner watermarks */
+.workspace-shell {
+  position: relative;
+  background-image:
+    radial-gradient(ellipse 60% 45% at 0% 0%, rgba(6, 182, 212, 0.10), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 100% 100%, rgba(99, 102, 241, 0.10), transparent 70%),
+    radial-gradient(ellipse 45% 35% at 100% 0%, rgba(20, 184, 166, 0.07), transparent 65%);
+}
+.dark .workspace-shell {
+  background-image:
+    radial-gradient(ellipse 65% 50% at 0% 0%, rgba(6, 182, 212, 0.16), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(99, 102, 241, 0.16), transparent 70%),
+    radial-gradient(ellipse 45% 40% at 50% 100%, rgba(14, 165, 233, 0.10), transparent 65%);
+}
+
+/* Ambient bottom-right & bottom-left circuit trace watermarks behind main content */
+.workspace-main {
+  position: relative;
+  z-index: 1;
+}
+.workspace-main::before,
+.workspace-main::after {
+  content: '';
+  position: fixed;
+  pointer-events: none;
+  z-index: -1;
+  background-image: var(--circuit-img);
+  background-size: cover;
+  background-position: center;
+}
+.workspace-main::before {
+  right: 0;
+  bottom: 0;
+  width: min(640px, 78vw);
+  height: min(260px, 38vh);
+  opacity: 0.16;
+  transform: scale(-1, -1);
+  -webkit-mask-image: radial-gradient(ellipse 95% 95% at 0% 0%, #000 0%, rgba(0,0,0,0.55) 42%, transparent 82%);
+  mask-image: radial-gradient(ellipse 95% 95% at 0% 0%, #000 0%, rgba(0,0,0,0.55) 42%, transparent 82%);
+}
+.workspace-main::after {
+  left: 0;
+  bottom: 0;
+  width: min(520px, 65vw);
+  height: min(210px, 32vh);
+  opacity: 0.12;
+  transform: scaleY(-1);
+  -webkit-mask-image: radial-gradient(ellipse 95% 95% at 0% 0%, #000 0%, rgba(0,0,0,0.45) 38%, transparent 80%);
+  mask-image: radial-gradient(ellipse 95% 95% at 0% 0%, #000 0%, rgba(0,0,0,0.45) 38%, transparent 80%);
+}
+.dark .workspace-main::before { opacity: 0.28; }
+.dark .workspace-main::after  { opacity: 0.22; }
+
+/* Reusable circuit-trace surface utilities */
+.circuit-banner,
+.circuit-card,
+.circuit-strip,
+.circuit-modal-header,
+.circuit-drawer-header {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Hero / page banner: prominent circuit traces anchored top-left fading right */
+.circuit-banner {
+  background: linear-gradient(110deg, #020617 0%, #0f172a 55%, #1e1b4b 100%);
+  color: #f8fafc;
+  border: 1px solid rgba(34, 211, 238, 0.28) !important;
+  box-shadow: 0 10px 30px -10px rgba(2, 6, 23, 0.45), 0 0 20px rgba(6, 182, 212, 0.12);
+}
+.circuit-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: min(620px, 85%);
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, rgba(2, 6, 23, 0.42) 0%, rgba(15, 23, 42, 0.25) 50%, rgba(15, 23, 42, 0.05) 100%),
+    var(--circuit-img);
+  background-size: cover;
+  background-position: left center;
+  opacity: 0.85;
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 35%, rgba(0,0,0,0.45) 68%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 0%, #000 35%, rgba(0,0,0,0.45) 68%, transparent 100%);
+}
+.circuit-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: min(360px, 45%);
+  pointer-events: none;
+  background-image: var(--circuit-img);
+  background-size: cover;
+  background-position: right center;
+  transform: scaleX(-1);
+  opacity: 0.28;
+  -webkit-mask-image: linear-gradient(to right, #000 0%, transparent 90%);
+  mask-image: linear-gradient(to right, #000 0%, transparent 90%);
+}
+.circuit-banner > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Card / panel accent: subtle circuit traces in corner fading smoothly into card body */
+.circuit-card {
+  border-color: rgba(6, 182, 212, 0.22) !important;
+  box-shadow: 0 4px 18px -4px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(6, 182, 212, 0.06);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.dark .circuit-card {
+  border-color: rgba(34, 211, 238, 0.22) !important;
+  box-shadow: 0 6px 24px -6px rgba(0, 0, 0, 0.55), 0 0 14px rgba(6, 182, 212, 0.08);
+}
+.circuit-card:hover {
+  border-color: rgba(6, 182, 212, 0.45) !important;
+}
+.circuit-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: min(290px, 78%);
+  height: min(115px, 100%);
+  pointer-events: none;
+  background-image: var(--circuit-img);
+  background-size: cover;
+  background-position: left center;
+  opacity: 0.13;
+  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 0%, rgba(0,0,0,0.5) 45%, transparent 85%);
+  mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 0%, rgba(0,0,0,0.5) 45%, transparent 85%);
+}
+.dark .circuit-card::before {
+  opacity: 0.26;
+}
+.circuit-card-right::before {
+  left: auto;
+  right: 0;
+  transform: scaleX(-1);
+}
+.circuit-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Horizontal toolbar / filter strip with left-to-right circuit fade */
+.circuit-strip {
+  border-color: rgba(6, 182, 212, 0.24) !important;
+  box-shadow: 0 2px 12px -2px rgba(6, 182, 212, 0.08);
+}
+.dark .circuit-strip {
+  border-color: rgba(34, 211, 238, 0.24) !important;
+  box-shadow: 0 2px 14px -2px rgba(6, 182, 212, 0.14);
+}
+.circuit-strip::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: min(340px, 60%);
+  pointer-events: none;
+  background-image: var(--circuit-img);
+  background-size: cover;
+  background-position: left center;
+  opacity: 0.12;
+  -webkit-mask-image: linear-gradient(to right, #000 0%, rgba(0,0,0,0.5) 35%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 0%, rgba(0,0,0,0.5) 35%, transparent 100%);
+}
+.dark .circuit-strip::before {
+  opacity: 0.24;
+}
+.circuit-strip > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Gantt project & product group rows with subtle fading circuit traces */
+.gantt-group-label {
+  position: relative;
+  overflow: hidden;
+}
+.gantt-group-label::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 210px;
+  pointer-events: none;
+  background-image: var(--circuit-img);
+  background-size: cover;
+  background-position: left center;
+  opacity: 0.11;
+  -webkit-mask-image: linear-gradient(to right, #000 0%, rgba(0,0,0,0.45) 40%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 0%, rgba(0,0,0,0.45) 40%, transparent 100%);
+}
+.dark .gantt-group-label::before {
+  opacity: 0.22;
+}
+.gantt-group-label > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Task detail drawer & modal circuit banner headers */
+.circuit-drawer-header,
+.circuit-modal-header {
+  border-color: rgba(6, 182, 212, 0.25) !important;
+}
+.circuit-drawer-header::before,
+.circuit-modal-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 110px;
+  pointer-events: none;
+  background-image: var(--circuit-img);
+  background-size: cover;
+  background-position: left center;
+  opacity: 0.14;
+  -webkit-mask-image: linear-gradient(135deg, #000 0%, rgba(0,0,0,0.5) 40%, transparent 85%);
+  mask-image: linear-gradient(135deg, #000 0%, rgba(0,0,0,0.5) 40%, transparent 85%);
+}
+.dark .circuit-drawer-header::before,
+.dark .circuit-modal-header::before {
+  opacity: 0.28;
+}
+.circuit-drawer-header > *,
+.circuit-modal-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Mobile bottom nav subtle circuit trace strip */
+.mobile-bottom-nav {
+  position: relative;
+  overflow: hidden;
+}
+.mobile-bottom-nav::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--circuit-img);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.10;
+  -webkit-mask-image: linear-gradient(to right, #000 0%, transparent 50%, #000 100%);
+  mask-image: linear-gradient(to right, #000 0%, transparent 50%, #000 100%);
+}
+.dark .mobile-bottom-nav::before {
+  opacity: 0.22;
+}
+.mobile-bottom-nav > * {
+  position: relative;
+  z-index: 1;
+}
