@@ -2,7 +2,9 @@
 
 ## Request and result
 
-Latest request: replaced the repeated `header-circuit.jpg` background in the Sign-In left story panel (`src/AuthGate.tsx`, `src/auth.css`) with the looping video `src/assets/vid.mp4` (`<video className="auth-story-video" autoPlay loop muted playsInline />`) faded with a gradient mask and dark shade, while keeping `<CircuitElectricityOverlay />` layered on top.
+Latest request: replaced `src/assets/vid.mp4` with the user's `vid 2 .mp4` video for the Sign-In left story panel background (`src/AuthGate.tsx`, `src/auth.css`), keeping the gradient fade mask and `<CircuitElectricityOverlay />` layered on top.
+
+Previous: replaced the repeated `header-circuit.jpg` background in the Sign-In left story panel (`src/AuthGate.tsx`, `src/auth.css`) with the looping video `src/assets/vid.mp4` (`<video className="auth-story-video" autoPlay loop muted playsInline />`) faded with a gradient mask and dark shade, while keeping `<CircuitElectricityOverlay />` layered on top.
 
 Previous: added a live animated PCB circuit-trace electricity overlay (`<CircuitElectricityOverlay />` in `src/CircuitElectricityOverlay.tsx`, styled in `src/auth.css`) to the Sign-In left story panel (`src/AuthGate.tsx`) with glowing cyan electricity surges racing along 45-degree PCB traces, pulsing solder vias, and fixed background image scaling (`background-size: 380px auto`) so the circuit backdrop stays sharp on tall screens.
 
