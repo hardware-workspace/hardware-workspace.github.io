@@ -2,7 +2,7 @@
 
 ## Request and result
 
-Latest request: replaced the plain splash and page-reload screens (`Checking workspace access...` and `<Suspense>` fallback `Loading...` in `src/AuthGate.tsx`) with `<PcbSplashLoader />` (`src/PcbSplashLoader.tsx`, styled in `src/auth.css`), featuring a central MCU hub whose 45-degree PCB traces draw outward across the full viewport with concentric igniting solder vias.
+Latest request: reverted the dark HUD card in `<PcbSplashLoader />` (`src/PcbSplashLoader.tsx`, `src/auth.css`) back to the original `#f8fafc` background and `#616980` centered status text, with crisp 45-degree PCB traces slowly drawing outward across the viewport background.
 
 Previous: added a right-to-left dark blue gradient blended with circuit traces on `.circuit-strip` toolbars (`src/index.css`) while excluding the sticky `.gantt-main-scroll` header column, and updated right-side toolbar pill/helper-text contrast in `src/App.tsx`.
 
