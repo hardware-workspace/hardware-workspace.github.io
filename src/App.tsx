@@ -391,6 +391,21 @@ function formatShortDate(dateStr) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
+function formatAuditTimestamp(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return String(isoStr);
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Cairo',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(d);
+}
+
 function getWeightBarStyle(status, weight = 5) {
   const meta = STATUS_META[status] || STATUS_META.backlog;
   const [r, g, b] = meta.rgb;
@@ -5309,13 +5324,20 @@ function TaskSidePanel({
             {showActivity && (
               <div className="mt-2 space-y-1.5 max-h-40 overflow-y-auto text-[11px]">
                 {visibleLogs.map((a) => (
-                  <div key={a.id} className="p-2 rounded-lg bg-stone-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      {userMap[a.actor_id]?.name || 'System'}
-                    </span>{' '}
-                    changed <span className="font-semibold text-indigo-600 dark:text-indigo-400">{auditLabels[a.field] || a.field.replaceAll('_', ' ')}</span>:{' '}
-                    <span className="line-through opacity-75">{auditValue(a.field, a.old_value)}</span> →{' '}
-                    <span className="font-semibold text-slate-900 dark:text-white">{auditValue(a.field, a.new_value)}</span>
+                  <div key={a.id} className="p-2 rounded-lg bg-stone-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                    <div>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {userMap[a.actor_id]?.name || 'System'}
+                      </span>{' '}
+                      changed <span className="font-semibold text-indigo-600 dark:text-indigo-400">{auditLabels[a.field] || a.field.replaceAll('_', ' ')}</span>:{' '}
+                      <span className="line-through opacity-75">{auditValue(a.field, a.old_value)}</span> →{' '}
+                      <span className="font-semibold text-slate-900 dark:text-white">{auditValue(a.field, a.new_value)}</span>
+                    </div>
+                    {a.created_at && (
+                      <time dateTime={a.created_at} className="text-[10px] text-slate-400 dark:text-slate-500 tabular-nums shrink-0 ml-auto">
+                        {formatAuditTimestamp(a.created_at)}
+                      </time>
+                    )}
                   </div>
                 ))}
               </div>
