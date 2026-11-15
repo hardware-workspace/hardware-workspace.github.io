@@ -1933,7 +1933,7 @@ export default function App({ account, onSignOut }) {
             aria-hidden="true"
             className="pointer-events-none absolute inset-y-0 left-0 w-[460px] max-w-[70%] bg-cover bg-left"
             style={{
-              backgroundImage: `url(${headerCircuitImage})`,
+              backgroundImage: `linear-gradient(90deg, rgba(2,6,23,0.72) 0%, rgba(15,23,42,0.45) 45%, rgba(15,23,42,0.1) 100%), url(${headerCircuitImage})`,
               WebkitMaskImage: 'linear-gradient(to right, #000 0%, #000 35%, transparent 100%)',
               maskImage: 'linear-gradient(to right, #000 0%, #000 35%, transparent 100%)',
             }}
@@ -1943,9 +1943,12 @@ export default function App({ account, onSignOut }) {
             <div className="flex items-center justify-between w-full sm:w-auto gap-4">
               <div className="flex items-center gap-2.5 min-h-9">
                 <div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <h1 className="font-bold text-sm sm:text-base tracking-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
-                      CommTeam Task Manager
+                  <div className="flex items-center gap-1.5">
+                    <h1 className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-slate-950/55 backdrop-blur-sm ring-1 ring-cyan-300/25 shadow-[0_0_12px_rgba(34,211,238,0.25)] px-2.5 py-1 font-extrabold text-sm sm:text-base tracking-tight">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_6px_rgba(103,232,249,0.9)] shrink-0" aria-hidden="true" />
+                      <span className="bg-gradient-to-r from-white via-sky-100 to-cyan-300 bg-clip-text text-transparent">
+                        CommTeam Task Manager
+                      </span>
                     </h1>
                   </div>
 
