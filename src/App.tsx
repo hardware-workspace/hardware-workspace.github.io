@@ -3143,10 +3143,9 @@ function GanttClock() {
 
   return (
     <time dateTime={now.toISOString()} title="Current date and time in Cairo" aria-label={`Cairo date and time: ${date}, ${time}`}
-      className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-cyan-300/60 bg-white/90 px-2.5 py-1 font-mono text-[11px] font-semibold tabular-nums text-slate-700 shadow-sm dark:border-cyan-700 dark:bg-slate-900/90 dark:text-slate-200">
-      <Clock className="h-3.5 w-3.5 text-cyan-700 dark:text-cyan-300" aria-hidden="true" />
+      className="ml-auto inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-2 py-0.5 font-sans text-2xl font-extrabold tracking-tight tabular-nums sm:text-3xl bg-gradient-to-r from-white via-sky-100 to-cyan-300 bg-clip-text text-transparent">
       <span>{date}</span>
-      <span className="text-slate-400" aria-hidden="true">·</span>
+      <span aria-hidden="true">·</span>
       <span>{time}</span>
     </time>
   );

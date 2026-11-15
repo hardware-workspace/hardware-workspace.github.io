@@ -1,5 +1,9 @@
 # Latest handoff
 
+## 15 November 2026 — Larger Gantt clock
+
+Restyled the Gantt clock to match the Dashboard heading: 2xl/3xl bold sans-serif text with the same white-to-cyan gradient, removing its tiny bordered badge. Date/time formatting and Cairo timezone remain as before. `npm run build` passed. Production publish and verification are pending. Next step: publish this scoped change and verify live, then take the user's next request.
+
 ## 15 November 2026 — Gantt date and time
 
 Added a live Cairo date/time readout to the Gantt controls, formatted day/month/year and 12-hour time with seconds and AM/PM. It updates once per second within its own component and cleans up its timer. `npm run build` passed; a fixed-time check produced `15/11/2026 03:04:05 PM`. Commit `3ef2658` was pushed to `main`, and `npm run deploy:verify` confirmed production serves it and its JavaScript entrypoint. Next step: take the user's next request.
