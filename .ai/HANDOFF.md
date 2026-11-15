@@ -2,9 +2,9 @@
 
 ## Request and result
 
-Latest request: added a right-to-left dark blue gradient blended with circuit traces on `.circuit-strip` toolbars (`src/index.css`) while excluding the sticky `.gantt-main-scroll` header column, and updated right-side toolbar pill/helper-text contrast in `src/App.tsx`.
+Latest request: replaced the plain splash and page-reload screens (`Checking workspace access...` and `<Suspense>` fallback `Loading...` in `src/AuthGate.tsx`) with `<PcbSplashLoader />` (`src/PcbSplashLoader.tsx`, styled in `src/auth.css`), featuring a central MCU hub whose 45-degree PCB traces draw outward across the full viewport with concentric igniting solder vias.
 
-Previous: added a Cairo date and time stamp (`formatAuditTimestamp`) to each Activity Audit Log entry inside `TaskSidePanel` in `src/App.tsx`.
+Previous: added a right-to-left dark blue gradient blended with circuit traces on `.circuit-strip` toolbars (`src/index.css`) while excluding the sticky `.gantt-main-scroll` header column, and updated right-side toolbar pill/helper-text contrast in `src/App.tsx`.
 
 Previous: replaced the repeated `header-circuit.jpg` background in the Sign-In left story panel (`src/AuthGate.tsx`, `src/auth.css`) with the looping video `src/assets/vid.mp4` (`<video className="auth-story-video" autoPlay loop muted playsInline />`) faded with a gradient mask and dark shade, while keeping `<CircuitElectricityOverlay />` layered on top.
 
