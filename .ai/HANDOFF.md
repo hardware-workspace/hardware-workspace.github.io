@@ -2,7 +2,7 @@
 
 ## 15 November 2026 — Larger Gantt clock
 
-Restyled the Gantt clock to match the Dashboard heading: 2xl/3xl bold sans-serif text with the same white-to-cyan gradient, removing its tiny bordered badge. Date/time formatting and Cairo timezone remain as before. `npm run build` passed. Production publish and verification are pending. Next step: publish this scoped change and verify live, then take the user's next request.
+Restyled the Gantt clock to match the Dashboard heading: 2xl/3xl bold sans-serif text with the same white-to-cyan gradient, removing its tiny bordered badge. Date/time formatting and Cairo timezone remain as before. `npm run build` passed. Commit `28e85b4` was pushed to `main`; `npm run deploy:verify` confirmed production serves it and its JavaScript entrypoint. Next step: take the user's next request.
 
 ## 15 November 2026 — Gantt date and time
 
