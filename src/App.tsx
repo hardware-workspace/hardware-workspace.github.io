@@ -1,4 +1,5 @@
 import { useSharedWorkspace } from './sharedWorkspace';
+import headerCircuitImage from './assets/header-circuit.jpg';
 import AccountSettings from './AccountSettings';
 import Dashboard from './Dashboard';
 import EmailPreferences from './EmailPreferences';
@@ -1926,17 +1927,24 @@ export default function App({ account, onSignOut }) {
         {/* ==================================================================== */}
         {/* TOP NAVIGATION BAR */}
         {/* ==================================================================== */}
-        <header className="workspace-header shrink-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-stone-200 dark:border-slate-800 px-3 lg:px-6 py-2">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5">
+        <header className="workspace-header relative overflow-hidden shrink-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-stone-200 dark:border-slate-800 px-3 lg:px-6 py-2">
+          {/* Circuit-board banner: anchored top-left, fading out toward the right */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 w-[460px] max-w-[70%] bg-cover bg-left"
+            style={{
+              backgroundImage: `url(${headerCircuitImage})`,
+              WebkitMaskImage: 'linear-gradient(to right, #000 0%, #000 35%, transparent 100%)',
+              maskImage: 'linear-gradient(to right, #000 0%, #000 35%, transparent 100%)',
+            }}
+          />
+          <div className="relative flex flex-col sm:flex-row items-center justify-between gap-2.5">
             {/* Brand & Main Navigation Tabs */}
             <div className="flex items-center justify-between w-full sm:w-auto gap-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-teal-500 flex items-center justify-center text-white shadow-sm shrink-0">
-                  <Layers className="w-5 h-5" />
-                </div>
+              <div className="flex items-center gap-2.5 min-h-9">
                 <div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <h1 className="font-bold text-sm sm:text-base tracking-tight text-slate-900 dark:text-white">
+                    <h1 className="font-bold text-sm sm:text-base tracking-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
                       CommTeam Task Manager
                     </h1>
                   </div>
