@@ -2,9 +2,9 @@
 
 ## Request and result
 
-Latest request: fixed Gantt left column horizontal sticky positioning in `src/index.css` so `position: relative` on `.circuit-strip`, `.gantt-group-label`, and `> *` child stacking rules no longer override `.sticky` / `.absolute` on the sticky `Tasks` header, group rows, task rows, or column resize handle.
+Latest request: added a new "Tools" tab in `src/App.tsx` (desktop header & mobile bottom nav) with the Voltage Divider Calculator in `src/HardwareToolsView.tsx` supporting schematic display, Ω/kΩ/MΩ unit conversion, 4-way solving (`Vs`, `R1`, `R2`, `Vout`), orange target field indicator, and live circuit operating point stats.
 
-Previous: reverted the dark HUD card in `<PcbSplashLoader />` (`src/PcbSplashLoader.tsx`, `src/auth.css`) back to the original `#f8fafc` background and `#616980` centered status text, with crisp 45-degree PCB traces slowly drawing outward across the viewport background.
+Previous: fixed Gantt left column horizontal sticky positioning in `src/index.css` so `position: relative` on `.circuit-strip`, `.gantt-group-label`, and `> *` child stacking rules no longer override `.sticky` / `.absolute` on the sticky `Tasks` header, group rows, task rows, or column resize handle.
 
 Previous: replaced the repeated `header-circuit.jpg` background in the Sign-In left story panel (`src/AuthGate.tsx`, `src/auth.css`) with the looping video `src/assets/vid.mp4` (`<video className="auth-story-video" autoPlay loop muted playsInline />`) faded with a gradient mask and dark shade, while keeping `<CircuitElectricityOverlay />` layered on top.
 

@@ -4,6 +4,7 @@ import SignalPulse from './SignalPulse';
 import AccountSettings from './AccountSettings';
 import Dashboard from './Dashboard';
 import EmailPreferences from './EmailPreferences';
+import HardwareToolsView from './HardwareToolsView';
 import { realAccount } from './taskEmails';
 import { supabase } from './supabaseClient';
 import { escapeCsvCell } from './security';
@@ -59,7 +60,8 @@ import {
   Minimize2,
   GripVertical,
   Lock,
-  Unlock
+  Unlock,
+  Wrench
 } from 'lucide-react';
 
 // ============================================================================
@@ -1987,6 +1989,7 @@ export default function App({ account, onSignOut }) {
                   { id: 'gantt', label: 'Gantt', icon: Calendar },
                   { id: 'kanban', label: 'Kanban', icon: LayoutGrid },
                   { id: 'team', label: 'Team', icon: Users },
+                  { id: 'tools', label: 'Tools', icon: Wrench },
                   { id: 'settings', label: 'Settings', icon: Settings },
                 ].map((item) => {
                   const Icon = item.icon;
@@ -2439,6 +2442,12 @@ export default function App({ account, onSignOut }) {
             </div>
           )}
 
+          {activeTab === 'tools' && (
+            <div className="flex-1 overflow-y-auto pr-1">
+              <HardwareToolsView />
+            </div>
+          )}
+
           {activeTab === 'settings' && (
             <div className="settings-scroll flex-1 overflow-y-auto pr-1">
               <AccountSettings account={currentUser} onUpdated={patch=>setUsers(previous=>previous.map(user=>user.id===currentUser.id?{...user,...patch}:user))} onSignOut={onSignOut}/><EmailPreferences userId={currentUser.id}/>{currentUser.role === 'manager' && <SettingsView
@@ -2461,8 +2470,8 @@ export default function App({ account, onSignOut }) {
           )}
           </>}
         </main>
-        <nav aria-label="Mobile workspace navigation" className="mobile-bottom-nav md:hidden grid grid-cols-5 shrink-0 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          {[{id:'dashboard',label:'Overview',icon:Activity},{id:'gantt',label:'Gantt',icon:Calendar},{id:'kanban',label:'Board',icon:LayoutGrid},{id:'team',label:'Team',icon:Users},{id:'settings',label:'Settings',icon:Settings}].map(({id,label,icon:Icon})=><button key={id} aria-current={activeTab===id?'page':undefined} onClick={()=>setActiveTab(id)} className={'flex flex-col gap-1 items-center justify-center py-2 text-[11px] font-semibold '+(activeTab===id?'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50':'text-slate-500')}><Icon size={20}/>{label}</button>)}
+        <nav aria-label="Mobile workspace navigation" className="mobile-bottom-nav md:hidden grid grid-cols-6 shrink-0 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          {[{id:'dashboard',label:'Overview',icon:Activity},{id:'gantt',label:'Gantt',icon:Calendar},{id:'kanban',label:'Board',icon:LayoutGrid},{id:'team',label:'Team',icon:Users},{id:'tools',label:'Tools',icon:Wrench},{id:'settings',label:'Settings',icon:Settings}].map(({id,label,icon:Icon})=><button key={id} aria-current={activeTab===id?'page':undefined} onClick={()=>setActiveTab(id)} className={'flex flex-col gap-1 items-center justify-center py-2 text-[11px] font-semibold '+(activeTab===id?'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50':'text-slate-500')}><Icon size={20}/>{label}</button>)}
         </nav>
 
         {/* ==================================================================== */}
