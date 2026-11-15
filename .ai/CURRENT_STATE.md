@@ -6,7 +6,7 @@
 - The detailed handoff guide predates recent Gantt releases; use current code and Git history for those features. Existing release and migration guards remain in place.
 - Known deployment constraint: earlier SQL Editor changes may not appear in Supabase migration history. Reconcile before any database workflow deployment.
 - Gantt project and product rows support manager drag ordering; task rows can be sorted locally by date, status, or name. The eligible assignee directory refreshes while the app is open.
-- The Gantt controls show a live Cairo clock in DD/MM/YYYY and 12-hour hh:mm:ss AM/PM format.
+- The Gantt controls show a live Cairo clock with large 12-hour hh:mm:ss AM/PM time above a smaller DD/MM/YYYY date.
 - The Tools scientific calculator offers Classic, Explorer, and Modern keypad layouts. They share the existing calculation engine; the selected layout is saved in the browser.
 - Local untracked user files existed at the start of this setup: `User Guides/`, `hardware-tool-projects.json`, and `production-clear-proof.png`. Preserve them; never stage the JSON or image.
 
