@@ -1,5 +1,7 @@
 # Meaningful development changes
 
+- 16 November 2026: Added multiple-dependency support (`src/App.tsx`) so tasks can wait for multiple prerequisite tasks to finish and link to multiple dependent tasks across the Gantt chart, Task Detail Drawer, and New Task modal.
+
 - 16 November 2026: Added a persistent Hide/Show Done tasks toggle button in the Gantt `TASKS` column header (`src/App.tsx`).
 
 - 16 November 2026: Built a full native interactive Online Smith Chart & RF impedance matching module in `src/SmithChartTool.tsx` (with optional `onlinesmithchart.com` frame/external link).

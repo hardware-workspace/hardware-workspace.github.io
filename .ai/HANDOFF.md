@@ -1,5 +1,9 @@
 # Latest handoff
 
+## 16 November 2026 — Multiple task dependencies (multiple prerequisites & dependent tasks)
+
+Added support in `src/App.tsx` for linking a task to multiple prerequisite tasks (`Starts after`) and multiple dependent follow-up tasks (`Next tasks`). Tasks now schedule and auto-cascade after the latest effective end date across all linked prerequisites, require all prerequisites to be `Done` before transitioning to `Done`, render individual Gantt SVG dependency wires (with per-wire `×` unlinking and additive `●` drag-to-link), and allow adding/unlinking multiple prerequisites in `TaskDetailDrawer` and `NewTaskModal` while preserving full compatibility with `save_shared_workspace` and `create_task_from_note`.
+
 ## 16 November 2026 — Blocked tasks no longer count toward daily weight totals
 
 Excluded `status === 'blocked'` tasks from both daily-weight calculations in `src/App.tsx`: the Gantt Daily Person Capacity Overlay (`dailyOverlayData`) now skips them like done tasks, so they add nothing to per-assignee totals, the all-assignee day total, the busiest-member max, or the tooltip task lists; Team Workload member cards' `todayWeight` badge also ignores blocked tasks active today. `npm run check:focused` and `npm run build` passed. Commit `71fbdcd` (it also carries a pre-existing no-op line-ending normalization in `src/EmailPreferences.tsx` swept by the publisher's `git add -u`) was pushed to `main`; `node scripts/verify-deployment.mjs` confirmed production serves that commit and its JavaScript entrypoint. Next step: take the user's next request.

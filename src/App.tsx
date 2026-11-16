@@ -387,6 +387,65 @@ function getBlockedEndDate(task, plannedEnd) {
   return addTaskDays(task, addCalendarDays(plannedEnd, 1), blockedDays) || plannedEnd;
 }
 
+function isDependenciesEnabled(task) {
+  if (!task) return true;
+  const raw = task.dependencies_enabled;
+  if (raw === false) return false;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.enabled === false) return false;
+  return true;
+}
+
+function getPrerequisiteIds(task) {
+  if (!task) return [];
+  const ids = [];
+  const add = (id) => {
+    if (typeof id === 'string' && id.trim() && id.trim() !== task.id && !ids.includes(id.trim())) {
+      ids.push(id.trim());
+    }
+  };
+  if (Array.isArray(task.depends_on_ids)) {
+    task.depends_on_ids.forEach(add);
+  }
+  const rawEnabled = task.dependencies_enabled;
+  if (Array.isArray(rawEnabled)) {
+    rawEnabled.forEach(add);
+  } else if (rawEnabled && typeof rawEnabled === 'object' && Array.isArray(rawEnabled.ids)) {
+    rawEnabled.ids.forEach(add);
+  }
+  if (typeof task.depends_on_id === 'string' && task.depends_on_id.trim()) {
+    task.depends_on_id.split(',').forEach(add);
+  }
+  return ids;
+}
+
+function buildDependencyFields(prereqIds, enabled = true, taskLookup = null, excludeId = null) {
+  const cleanIds = [];
+  (prereqIds || []).forEach((id) => {
+    if (typeof id === 'string' && id.trim() && id.trim() !== excludeId && !cleanIds.includes(id.trim())) {
+      cleanIds.push(id.trim());
+    }
+  });
+  const isEnabled = enabled !== false;
+  let primaryId = cleanIds[0] || null;
+  if (cleanIds.length > 1 && taskLookup) {
+    const getTask = typeof taskLookup.get === 'function' ? (id) => taskLookup.get(id) : (id) => taskLookup[id];
+    const incomplete = cleanIds.find((id) => getTask(id)?.status !== 'done');
+    primaryId = incomplete || cleanIds[0];
+  }
+  let dependencies_enabled;
+  if (cleanIds.length <= 1) {
+    dependencies_enabled = isEnabled;
+  } else if (isEnabled) {
+    dependencies_enabled = cleanIds;
+  } else {
+    dependencies_enabled = { enabled: false, ids: cleanIds };
+  }
+  return {
+    depends_on_id: primaryId,
+    dependencies_enabled,
+  };
+}
+
 function formatShortDate(dateStr) {
   if (!dateStr) return '—';
   const d = new Date(dateStr + 'T00:00:00Z');
@@ -1226,8 +1285,12 @@ export default function App({ account, onSignOut }) {
           pending.delete(task.id);
           continue;
         }
-        if (status === 'done' && task.depends_on_id && lookup.get(task.depends_on_id)?.status !== 'done') continue;
+        const prereqIds = getPrerequisiteIds(task);
+        if (status === 'done' && prereqIds.some((pid) => lookup.get(pid)?.status !== 'done')) continue;
         task.status = status;
+        if (prereqIds.length > 0) {
+          Object.assign(task, buildDependencyFields(prereqIds, isDependenciesEnabled(task), lookup, task.id));
+        }
         task.updated_at = timestamp;
         task.completed_at = status === 'done' ? timestamp : null;
         if (status === 'done') task.actual_days = Number(task.actual_days) || Number(task.planned_days) || 1;
@@ -1417,7 +1480,7 @@ export default function App({ account, onSignOut }) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [tasks, undoHistory, currentUser, groupMenu, doneTransitionModalState, blockedModalState, inProgressModalState, splitTaskModalTarget, editingProduct, editingProject, createHierarchyModalOpen, newTaskModalOpen, dryRunModalOpen, shortcutModalOpen]);
 
-  // Initial Rule: Auto-push any dependent task whose prerequisite is not Done yet
+  // Initial Rule: Auto-push any dependent task whose prerequisite(s) are not Done yet
   const cascadeDependentTasks = (taskList, changedTaskId) => {
     let updatedList = [...taskList];
     const visited = new Set();
@@ -1432,19 +1495,33 @@ export default function App({ account, onSignOut }) {
       const parentTask = updatedList.find((t) => t.id === parentId);
       if (!parentTask || !parentTask.start_date) continue;
 
-      const parentEnd = getEffectiveEndDate(parentTask);
-      if (!parentEnd) continue;
+      const byId = new Map(updatedList.map((t) => [t.id, t]));
 
       updatedList = updatedList.map((child) => {
-        if (child.depends_on_id === parentId && child.dependencies_enabled !== false && parentTask.dependencies_enabled !== false) {
-          if (parentTask.status !== 'done' || !child.start_date || child.start_date <= parentEnd) {
-            const nextStart = snapToTaskWorkingDay(child, addCalendarDays(parentEnd, 1));
+        const childPrereqIds = getPrerequisiteIds(child);
+        if (childPrereqIds.includes(parentId) && isDependenciesEnabled(child) && isDependenciesEnabled(parentTask)) {
+          const activePrereqs = childPrereqIds
+            .map((pid) => byId.get(pid))
+            .filter((p) => p && isDependenciesEnabled(p) && p.start_date);
+          let maxPrereqEnd = null;
+          let anyPrereqNotDone = false;
+          activePrereqs.forEach((p) => {
+            if (p.status !== 'done') anyPrereqNotDone = true;
+            const pEnd = getEffectiveEndDate(p);
+            if (pEnd && (!maxPrereqEnd || pEnd > maxPrereqEnd)) {
+              maxPrereqEnd = pEnd;
+            }
+          });
+
+          if (maxPrereqEnd && (anyPrereqNotDone || !child.start_date || child.start_date <= maxPrereqEnd)) {
+            const nextStart = snapToTaskWorkingDay(child, addCalendarDays(maxPrereqEnd, 1));
             const nextDue = addTaskDays(child, nextStart, child.planned_days || 1);
             if (child.start_date !== nextStart || child.due_date !== nextDue) {
               cascadedCount++;
               queue.push(child.id);
               return {
                 ...child,
+                ...buildDependencyFields(childPrereqIds, isDependenciesEnabled(child), byId, child.id),
                 start_date: nextStart,
                 due_date: nextDue,
                 updated_at: new Date().toISOString(),
@@ -1478,8 +1555,31 @@ export default function App({ account, onSignOut }) {
       return false;
     }
 
-    if (patch.status === 'done' && existing.status !== 'done' && existing.depends_on_id && taskMap[existing.depends_on_id]?.status !== 'done') {
-      pushToast('error', 'Finish the prerequisite first', taskMap[existing.depends_on_id]?.title || 'The prerequisite is missing.');
+    const existingPrereqIds = getPrerequisiteIds(existing);
+    const nextPrereqIds =
+      patch.depends_on_ids !== undefined
+        ? (patch.depends_on_ids || []).filter((id) => id && id !== taskId)
+        : patch.depends_on_id !== undefined
+        ? patch.depends_on_id
+          ? String(patch.depends_on_id)
+              .split(',')
+              .map((s) => s.trim())
+              .filter((id) => id && id !== taskId)
+          : []
+        : existingPrereqIds;
+    const nextDepsEnabled =
+      typeof patch.dependencies_enabled === 'boolean'
+        ? patch.dependencies_enabled
+        : isDependenciesEnabled(existing);
+
+    const checkPrereqIds = patch.status === 'done' ? nextPrereqIds : existingPrereqIds;
+    const unfinishedPrereqId = checkPrereqIds.find((pid) => taskMap[pid]?.status !== 'done');
+    if (patch.status === 'done' && existing.status !== 'done' && unfinishedPrereqId) {
+      pushToast(
+        'error',
+        'Finish the prerequisite first',
+        taskMap[unfinishedPrereqId]?.title || 'A prerequisite task is not Done yet.'
+      );
       return false;
     }
 
@@ -1499,7 +1599,23 @@ export default function App({ account, onSignOut }) {
       return false;
     }
 
-    const updated = { ...existing, ...patch, updated_at: new Date().toISOString() };
+    const cleanPatch = { ...patch };
+    delete cleanPatch.depends_on_ids;
+    const depFieldsChanged =
+      patch.depends_on_ids !== undefined ||
+      patch.depends_on_id !== undefined ||
+      patch.dependencies_enabled !== undefined ||
+      patch.status === 'done';
+    const normalizedDepFields = depFieldsChanged
+      ? buildDependencyFields(nextPrereqIds, nextDepsEnabled, taskMap, taskId)
+      : {};
+
+    const updated = {
+      ...existing,
+      ...cleanPatch,
+      ...normalizedDepFields,
+      updated_at: new Date().toISOString(),
+    };
 
     if (patch.start_date) {
       updated.start_date = snapToTaskWorkingDay(updated, patch.start_date);
@@ -1537,15 +1653,24 @@ export default function App({ account, onSignOut }) {
       }
     }
 
-    // If this task depends on a prerequisite that isn't Done yet, enforce starting at prerequisite's end day
-    if ((!shared || currentUser.role === 'manager') && updated.dependencies_enabled !== false && updated.depends_on_id) {
-      const prereq = tasks.find((t) => t.id === updated.depends_on_id);
-      if (prereq && prereq.dependencies_enabled !== false && prereq.status !== 'done' && prereq.start_date) {
-        const prereqEnd = getEffectiveEndDate(prereq);
-        if (prereqEnd && (!updated.start_date || updated.start_date <= prereqEnd)) {
-          updated.start_date = snapToTaskWorkingDay(updated, addCalendarDays(prereqEnd, 1));
-          updated.due_date = addTaskDays(updated, updated.start_date, updated.planned_days || 1);
+    // If this task depends on prerequisites, enforce starting after the latest prerequisite's end day
+    const updatedPrereqIds = getPrerequisiteIds(updated);
+    const depsWereAdded =
+      patch.depends_on_ids !== undefined || patch.depends_on_id !== undefined || patch.dependencies_enabled === true;
+    if ((!shared || currentUser.role === 'manager') && isDependenciesEnabled(updated) && updatedPrereqIds.length > 0) {
+      let maxPrereqEnd = null;
+      updatedPrereqIds.forEach((pid) => {
+        const prereq = tasks.find((t) => t.id === pid);
+        if (prereq && isDependenciesEnabled(prereq) && (prereq.status !== 'done' || depsWereAdded) && prereq.start_date) {
+          const prereqEnd = getEffectiveEndDate(prereq);
+          if (prereqEnd && (!maxPrereqEnd || prereqEnd > maxPrereqEnd)) {
+            maxPrereqEnd = prereqEnd;
+          }
         }
+      });
+      if (maxPrereqEnd && (!updated.start_date || updated.start_date <= maxPrereqEnd)) {
+        updated.start_date = snapToTaskWorkingDay(updated, addCalendarDays(maxPrereqEnd, 1));
+        updated.due_date = addTaskDays(updated, updated.start_date, updated.planned_days || 1);
       }
     }
 
@@ -1585,7 +1710,43 @@ export default function App({ account, onSignOut }) {
     }
 
     const newLogs = [];
-    Object.keys(patch).forEach((field) => {
+    const loggedFields = new Set(Object.keys(cleanPatch));
+    if (patch.depends_on_ids !== undefined) loggedFields.add('depends_on_id');
+    loggedFields.forEach((field) => {
+      if (field === 'depends_on_id') {
+        const oldDepStr = existingPrereqIds.join(',') || 'none';
+        const newDepStr = updatedPrereqIds.join(',') || 'none';
+        if (oldDepStr !== newDepStr) {
+          newLogs.push({
+            id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            task_id: taskId,
+            actor_id: currentUser.id,
+            action: 'field_update',
+            field: 'depends_on_id',
+            old_value: oldDepStr,
+            new_value: newDepStr,
+            created_at: new Date().toISOString(),
+          });
+        }
+        return;
+      }
+      if (field === 'dependencies_enabled') {
+        const oldEn = String(isDependenciesEnabled(existing));
+        const newEn = String(isDependenciesEnabled(updated));
+        if (oldEn !== newEn) {
+          newLogs.push({
+            id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            task_id: taskId,
+            actor_id: currentUser.id,
+            action: 'field_update',
+            field: 'dependencies_enabled',
+            old_value: oldEn,
+            new_value: newEn,
+            created_at: new Date().toISOString(),
+          });
+        }
+        return;
+      }
       if (existing[field] !== updated[field]) {
         newLogs.push({
           id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -1690,8 +1851,9 @@ export default function App({ account, onSignOut }) {
       return;
     }
 
-    if (targetStatus === 'done' && task.depends_on_id && taskMap[task.depends_on_id]?.status !== 'done') {
-      pushToast('error', 'Finish the prerequisite first', taskMap[task.depends_on_id]?.title || 'The prerequisite is missing.');
+    const unfinishedPrereqId = getPrerequisiteIds(task).find((pid) => taskMap[pid]?.status !== 'done');
+    if (targetStatus === 'done' && unfinishedPrereqId) {
+      pushToast('error', 'Finish the prerequisite first', taskMap[unfinishedPrereqId]?.title || 'A prerequisite task is not Done yet.');
       return false;
     }
 
@@ -1767,6 +1929,7 @@ export default function App({ account, onSignOut }) {
       actual_days: 0,
       blocked_days: 0,
       depends_on_id: updatedPart1.id, // Wire Part 2 to depend on Part 1
+      dependencies_enabled: true,
       start_date: p2Start,
       due_date: p2Due,
       status: 'backlog',
@@ -1899,7 +2062,9 @@ export default function App({ account, onSignOut }) {
       const proj = projectMap[t.project_id];
       const pl = proj ? productLineMap[proj.product_line_id] : null;
       const assignee = t.assignee_id ? userMap[t.assignee_id]?.name || '' : 'Unassigned';
-      const depTask = t.depends_on_id ? taskMap[t.depends_on_id]?.title || t.depends_on_id : '';
+      const depTask = getPrerequisiteIds(t)
+        .map((id) => taskMap[id]?.title || id)
+        .join(' | ');
       return [
         t.id,
         pl?.name || '',
@@ -2897,6 +3062,7 @@ export default function App({ account, onSignOut }) {
                         actual_days: 0,
                         blocked_days: 0,
                         depends_on_id: orig.id,
+                        dependencies_enabled: true,
                         start_date: nextStart,
                         due_date: nextDue,
                         completed_at: null,
@@ -2917,7 +3083,16 @@ export default function App({ account, onSignOut }) {
                       setTasks((prev) =>
                         prev.map((t) =>
                           t.id === doneTransitionModalState.linkedTaskId
-                            ? { ...t, depends_on_id: orig.id, updated_at: new Date().toISOString() }
+                            ? {
+                                ...t,
+                                ...buildDependencyFields(
+                                  [...getPrerequisiteIds(t), orig.id],
+                                  isDependenciesEnabled(t),
+                                  taskMap,
+                                  t.id
+                                ),
+                                updated_at: new Date().toISOString(),
+                              }
                             : t
                         )
                       );
@@ -3354,7 +3529,13 @@ function GanttView({
   const dependentCounts = useMemo(() => {
     const counts = {};
     allTasks.forEach((task) => {
-      if (task.dependencies_enabled !== false && task.depends_on_id && taskMap[task.depends_on_id]?.dependencies_enabled !== false) counts[task.depends_on_id] = (counts[task.depends_on_id] || 0) + 1;
+      if (isDependenciesEnabled(task)) {
+        getPrerequisiteIds(task).forEach((pid) => {
+          if (taskMap[pid] && isDependenciesEnabled(taskMap[pid])) {
+            counts[pid] = (counts[pid] || 0) + 1;
+          }
+        });
+      }
     });
     return counts;
   }, [allTasks, taskMap]);
@@ -3711,36 +3892,41 @@ function GanttView({
     visibleTaskRows.forEach((r, targetRowIdx) => {
       if (r.type !== 'task') return;
       const t = r.task;
-      if (t.dependencies_enabled === false || !t.depends_on_id || !t.start_date || !t.due_date) return;
-      const sourceRowIdx = indexMap[t.depends_on_id];
-      if (sourceRowIdx === undefined) return;
-      const sourceTask = taskMap[t.depends_on_id];
-      if (!sourceTask?.start_date || !sourceTask?.due_date || sourceTask.dependencies_enabled === false) return;
+      if (!isDependenciesEnabled(t) || !t.start_date || !t.due_date) return;
+      const prereqIds = getPrerequisiteIds(t);
+      if (prereqIds.length === 0) return;
 
-      const srcCoords = getBarCoordinates(sourceTask);
-      const tgtCoords = getBarCoordinates(t);
+      prereqIds.forEach((prereqId) => {
+        const sourceRowIdx = indexMap[prereqId];
+        if (sourceRowIdx === undefined) return;
+        const sourceTask = taskMap[prereqId];
+        if (!sourceTask?.start_date || !sourceTask?.due_date || !isDependenciesEnabled(sourceTask)) return;
 
-      // Coordinates relative to the right-side timeline track (0 = start of timeline track)
-      const x1 = srcCoords.leftPx + srcCoords.widthPx;
-      const y1 = rowOffsets[sourceRowIdx] + rowHeight / 2;
-      const x2 = tgtCoords.leftPx;
-      const y2 = rowOffsets[targetRowIdx] + rowHeight / 2;
+        const srcCoords = getBarCoordinates(sourceTask);
+        const tgtCoords = getBarCoordinates(t);
 
-      if (x1 < -100 && x2 < -100) return;
+        // Coordinates relative to the right-side timeline track (0 = start of timeline track)
+        const x1 = srcCoords.leftPx + srcCoords.widthPx;
+        const y1 = rowOffsets[sourceRowIdx] + rowHeight / 2;
+        const x2 = tgtCoords.leftPx;
+        const y2 = rowOffsets[targetRowIdx] + rowHeight / 2;
 
-      const midX = x1 + Math.max(14, (x2 - x1) / 2);
-      const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
-      const labelX = (x1 + x2) / 2;
-      const labelY = (y1 + y2) / 2;
-      wires.push({
-        id: `${sourceTask.id}->${t.id}`,
-        childTaskId: t.id,
-        parentTaskId: sourceTask.id,
-        d,
-        x2,
-        y2,
-        labelX,
-        labelY,
+        if (x1 < -100 && x2 < -100) return;
+
+        const midX = x1 + Math.max(14, (x2 - x1) / 2);
+        const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+        const labelX = (x1 + x2) / 2;
+        const labelY = (y1 + y2) / 2;
+        wires.push({
+          id: `${sourceTask.id}->${t.id}`,
+          childTaskId: t.id,
+          parentTaskId: sourceTask.id,
+          d,
+          x2,
+          y2,
+          labelX,
+          labelY,
+        });
       });
     });
     return wires;
@@ -4364,9 +4550,11 @@ function GanttView({
                           className="pointer-events-auto cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
+                            const childTask = taskMap[w.childTaskId];
+                            const remainingIds = getPrerequisiteIds(childTask).filter((id) => id !== w.parentTaskId);
                             onUpdateTask(
                               w.childTaskId,
-                              { depends_on_id: null },
+                              { depends_on_ids: remainingIds },
                               { allowUndo: true, actionLabel: 'Removed dependency link' }
                             );
                             pushToast('info', 'Dependency Unlinked', 'Removed dependency wire on the Gantt chart.');
@@ -4503,7 +4691,11 @@ function GanttView({
                                   const pMeta = PRIORITY_META[task.priority] || PRIORITY_META[3];
                                   const cMeta = CRITICALITY_META[task.criticality || 'medium'];
                                   const isDraggingThis = dragState && dragState.taskId === task.id;
-                                  const depTask = task.dependencies_enabled !== false && task.depends_on_id ? taskMap[task.depends_on_id] : null;
+                                  const depTasks = isDependenciesEnabled(task)
+                                    ? getPrerequisiteIds(task)
+                                        .map((id) => taskMap[id])
+                                        .filter(Boolean)
+                                    : [];
                                   const dependentChildrenCount = dependentCounts[task.id] || 0;
 
                                   const showDottedActual =
@@ -4557,12 +4749,15 @@ function GanttView({
                                                 · ⏸ {blockedDaysNum}d blocked
                                               </span>
                                             )}
-                                            {depTask && (
+                                            {depTasks.length > 0 && (
                                               <span
-                                                className="text-slate-500 truncate max-w-[110px]"
-                                                title={`Waits for: ${depTask.title}`}
+                                                className="text-slate-500 truncate max-w-[120px]"
+                                                title={`Waits for: ${depTasks.map((d) => d.title).join(', ')}`}
                                               >
-                                                · ⛓ {depTask.title.slice(0, 14)}..
+                                                · ⛓{' '}
+                                                {depTasks.length === 1
+                                                  ? `${depTasks[0].title.slice(0, 14)}..`
+                                                  : `${depTasks.length} prereqs`}
                                               </span>
                                             )}
                                             {dependentChildrenCount > 0 && (
@@ -4658,17 +4853,20 @@ function GanttView({
                                           }}
                                           onMouseUp={(e) => {
                                             if (linkingFromTaskId && linkingFromTaskId !== task.id) {
-                                              if (task.dependencies_enabled === false || taskMap[linkingFromTaskId]?.dependencies_enabled === false) {
+                                              if (!isDependenciesEnabled(task) || !isDependenciesEnabled(taskMap[linkingFromTaskId])) {
                                                 setLinkingFromTaskId(null);
                                                 pushToast('info', 'Dependencies disabled', 'Enable dependencies on both tasks before linking.');
                                                 return;
                                               }
                                               e.stopPropagation();
-                                              onUpdateTask(
-                                                task.id,
-                                                { depends_on_id: linkingFromTaskId },
-                                                { allowUndo: true, actionLabel: 'Linked task dependency on Gantt' }
-                                              );
+                                              const currentPrereqs = getPrerequisiteIds(task);
+                                              if (!currentPrereqs.includes(linkingFromTaskId)) {
+                                                onUpdateTask(
+                                                  task.id,
+                                                  { depends_on_ids: [...currentPrereqs, linkingFromTaskId] },
+                                                  { allowUndo: true, actionLabel: 'Linked task dependency on Gantt' }
+                                                );
+                                              }
                                               setLinkingFromTaskId(null);
                                               pushToast(
                                                 'success',
@@ -4770,7 +4968,7 @@ function GanttView({
                                               <div
                                                 onMouseDown={(e) => {
                                                   e.stopPropagation();
-                                                  if (task.dependencies_enabled === false) {
+                                                  if (!isDependenciesEnabled(task)) {
                                                     pushToast('info', 'Dependencies disabled', 'Enable dependencies for this task before linking.');
                                                     return;
                                                   }
@@ -4905,6 +5103,7 @@ function TaskSidePanel({
   const [depFilterPlId, setDepFilterPlId] = useState('');
   const [depFilterProjId, setDepFilterProjId] = useState(task?.project_id || '');
   useEffect(() => { setDepFilterPlId(projectMap[task?.project_id]?.product_line_id || ''); setDepFilterProjId(task?.project_id || ''); }, [task?.id, task?.project_id]);
+  const [prereqDepToAdd, setPrereqDepToAdd] = useState('');
   const [childDepToAdd, setChildDepToAdd] = useState('');
 
   if (!task) return null;
@@ -4912,12 +5111,20 @@ function TaskSidePanel({
   const project = projectMap[task.project_id];
   const productLine = project ? productLineMap[project.product_line_id] : null;
   const overdue = isTaskOverdue(task);
-  const prerequisiteTask = task.depends_on_id ? taskMap[task.depends_on_id] : null;
-  const dependentChildren = allTasks.filter((t) => t.depends_on_id === task.id);
-  const auditLabels = { dependencies_enabled: 'dependencies enabled', extra_hours_per_day: 'extra hours per regular day', friday_hours: 'Friday hours', saturday_hours: 'Saturday hours', assignee_id: 'assignee', details: 'notes', planned_days: 'planned time', actual_days: 'actual time', blocked_days: 'blocked time', blocked_reason: 'blocked reason', start_date: 'start date', due_date: 'end date', weight: 'daily weight', depends_on_id: 'prerequisite' };
+  const depsEnabled = isDependenciesEnabled(task);
+  const prerequisiteIds = getPrerequisiteIds(task);
+  const prerequisiteTasks = prerequisiteIds.map((id) => taskMap[id]).filter(Boolean);
+  const dependentChildren = allTasks.filter((t) => getPrerequisiteIds(t).includes(task.id));
+  const auditLabels = { dependencies_enabled: 'dependencies enabled', extra_hours_per_day: 'extra hours per regular day', friday_hours: 'Friday hours', saturday_hours: 'Saturday hours', assignee_id: 'assignee', details: 'notes', planned_days: 'planned time', actual_days: 'actual time', blocked_days: 'blocked time', blocked_reason: 'blocked reason', start_date: 'start date', due_date: 'end date', weight: 'daily weight', depends_on_id: 'prerequisites' };
   const auditValue = (field, value) => {
     if (field === 'assignee_id') return !value || value === 'none' ? 'Unassigned' : userMap[value]?.name || 'Former team member';
-    if (field === 'depends_on_id') return !value || value === 'none' ? 'None' : taskMap[value]?.title || 'Former task';
+    if (field === 'depends_on_id') {
+      if (!value || value === 'none') return 'None';
+      return String(value)
+        .split(',')
+        .map((id) => taskMap[id.trim()]?.title || 'Former task')
+        .join(', ');
+    }
     return value;
   };
   const visibleLogs = logs.reduce((result, entry) => {
@@ -5188,12 +5395,12 @@ function TaskSidePanel({
             </div>
 
             <label className="col-span-2 flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
-              <input type="checkbox" checked={task.dependencies_enabled !== false} disabled={!canEdit}
+              <input type="checkbox" checked={depsEnabled} disabled={!canEdit}
                 onChange={(event) => onUpdateTask(task.id, { dependencies_enabled: event.target.checked })}
                 className="accent-indigo-600" />
               Enable task dependencies
             </label>
-            {task.dependencies_enabled === false && <p className="col-span-2 text-[11px] text-slate-500">Existing links are kept, but they will not move dates until dependencies are enabled again.</p>}
+            {!depsEnabled && <p className="col-span-2 text-[11px] text-slate-500">Existing links are kept, but they will not move dates until dependencies are enabled again.</p>}
 
             {/* FRIENDLY TASK DEPENDENCY SECTION WITH PROJECT -> PRODUCT -> TASK FILTER */}
             <details open className="col-span-2 p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-700 space-y-4">
@@ -5206,10 +5413,10 @@ function TaskSidePanel({
                   Dates adjust automatically
                 </span>
               </summary>
-              <fieldset disabled={task.dependencies_enabled === false} className="space-y-4 disabled:opacity-50">
+              <fieldset disabled={!depsEnabled} className="space-y-4 disabled:opacity-50">
 
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Choose what must finish first and what follows this task.
+                Link one or more prerequisite tasks that must finish before this task starts, and one or more dependent tasks that start after this task finishes.
               </p>
 
               {/* Step 1 & 2: Filter Candidate Tasks by Project & Product */}
@@ -5255,37 +5462,90 @@ function TaskSidePanel({
                 </div>
               </div>
 
-              {/* Step 3A: Wait for this task to finish first (Prerequisite) */}
+              {/* Step 3A: Wait for these tasks to finish first (Multiple Prerequisites) */}
               <div>
-                <label className="text-slate-700 dark:text-slate-200 font-semibold block mb-2 text-xs">
-                  Starts after
-                </label>
-                <div className="flex items-center gap-2">
-                  <select
-                    disabled={!canEdit}
-                    value={task.depends_on_id || ''}
-                    onChange={(e) => onUpdateTask(task.id, { depends_on_id: e.target.value || null })}
-                    className="flex-1 min-w-0 h-10 px-2.5 rounded-lg bg-white dark:bg-slate-900 border border-stone-300 dark:border-slate-700 font-semibold text-xs"
-                  >
-                    <option value="">None — starts independently</option>
-                    {filteredCandidateTasks.map((other) => (
-                      <option key={other.id} value={other.id}>
-                        {other.title} ({STATUS_META[other.status]?.label}, Ends {other.due_date})
-                      </option>
-                    ))}
-                  </select>
-                  {prerequisiteTask && (
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-slate-700 dark:text-slate-200 font-semibold text-xs">
+                    Starts after ({prerequisiteTasks.length})
+                  </label>
+                  {canEdit && prerequisiteTasks.length > 1 && (
                     <button
-                      onClick={() => onSelectOtherTask(prerequisiteTask.id)}
-                      className="px-2 py-1.5 rounded-lg bg-indigo-600 text-white text-[11px] font-semibold shrink-0"
+                      type="button"
+                      onClick={() => onUpdateTask(task.id, { depends_on_ids: [] })}
+                      className="text-[11px] font-semibold text-rose-500 hover:text-rose-700"
                     >
-                      Open
+                      Unlink all
                     </button>
                   )}
                 </div>
+                {prerequisiteTasks.length === 0 ? (
+                  <p className="text-[11px] text-slate-500 mb-2.5">
+                    None — starts independently.
+                  </p>
+                ) : (
+                  <div className="space-y-1 mb-2.5">
+                    {prerequisiteTasks.map((prereq) => (
+                      <div
+                        key={prereq.id}
+                        className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-700 text-xs"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onSelectOtherTask(prereq.id)}
+                          className="text-left font-semibold text-indigo-600 dark:text-indigo-400 hover:underline truncate flex-1"
+                        >
+                          ← {prereq.title} ({STATUS_META[prereq.status]?.label}, Ends {prereq.due_date || '—'})
+                        </button>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onUpdateTask(task.id, {
+                                depends_on_ids: prerequisiteIds.filter((id) => id !== prereq.id),
+                              })
+                            }
+                            className="text-rose-500 hover:text-rose-700 ml-2 text-[11px] font-bold"
+                          >
+                            Unlink
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {canEdit && (
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={prereqDepToAdd}
+                      onChange={(e) => setPrereqDepToAdd(e.target.value)}
+                      className="flex-1 min-w-0 h-10 px-2.5 rounded-lg bg-white dark:bg-slate-900 border border-stone-300 dark:border-slate-700 text-xs"
+                    >
+                      <option value="">Choose a prerequisite task…</option>
+                      {filteredCandidateTasks
+                        .filter((other) => !prerequisiteIds.includes(other.id) && !getPrerequisiteIds(other).includes(task.id))
+                        .map((other) => (
+                          <option key={other.id} value={other.id}>
+                            {other.title} ({STATUS_META[other.status]?.label}, Ends {other.due_date || '—'})
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!prereqDepToAdd) return;
+                        onUpdateTask(task.id, { depends_on_ids: [...prerequisiteIds, prereqDepToAdd] });
+                        setPrereqDepToAdd('');
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shrink-0"
+                    >
+                      Add Prerequisite
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {/* Step 3B: Tasks that will start after this task finishes */}
+              {/* Step 3B: Tasks that will start after this task finishes (Multiple Dependent Tasks) */}
               <div>
                 <label className="text-slate-700 dark:text-slate-200 font-semibold block mb-2 text-xs">
                   Next tasks ({dependentChildren.length})
@@ -5302,14 +5562,20 @@ function TaskSidePanel({
                         className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-700 text-xs"
                       >
                         <button
+                          type="button"
                           onClick={() => onSelectOtherTask(child.id)}
                           className="text-left font-semibold text-indigo-600 dark:text-indigo-400 hover:underline truncate flex-1"
                         >
-                          → {child.title} (Starts {child.start_date})
+                          → {child.title} (Starts {child.start_date || '—'})
                         </button>
                         {canEdit && (
                           <button
-                            onClick={() => onUpdateTask(child.id, { depends_on_id: null })}
+                            type="button"
+                            onClick={() =>
+                              onUpdateTask(child.id, {
+                                depends_on_ids: getPrerequisiteIds(child).filter((id) => id !== task.id),
+                              })
+                            }
                             className="text-rose-500 hover:text-rose-700 ml-2 text-[11px] font-bold"
                           >
                             Unlink
@@ -5329,7 +5595,7 @@ function TaskSidePanel({
                     >
                       <option value="">Choose a next task…</option>
                       {filteredCandidateTasks
-                        .filter((t) => t.depends_on_id !== task.id)
+                        .filter((t) => !getPrerequisiteIds(t).includes(task.id) && !prerequisiteIds.includes(t.id))
                         .map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.title}
@@ -5337,12 +5603,17 @@ function TaskSidePanel({
                         ))}
                     </select>
                     <button
+                      type="button"
                       onClick={() => {
                         if (!childDepToAdd) return;
-                        onUpdateTask(childDepToAdd, { depends_on_id: task.id });
+                        const targetChild = taskMap[childDepToAdd];
+                        if (!targetChild) return;
+                        onUpdateTask(childDepToAdd, {
+                          depends_on_ids: [...getPrerequisiteIds(targetChild), task.id],
+                        });
                         setChildDepToAdd('');
                       }}
-                      className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs"
+                      className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shrink-0"
                     >
                       Link Next Task
                     </button>
@@ -5646,7 +5917,11 @@ function KanbanView({
                   const pMeta = PRIORITY_META[task.priority] || PRIORITY_META[3];
                   const cMeta = CRITICALITY_META[task.criticality || 'medium'];
                   const cCount = commentCounts[task.id] || 0;
-                  const depTask = task.dependencies_enabled !== false && task.depends_on_id ? taskMap[task.depends_on_id] : null;
+                  const depTasks = isDependenciesEnabled(task)
+                    ? getPrerequisiteIds(task)
+                        .map((id) => taskMap[id])
+                        .filter(Boolean)
+                    : [];
                   const isBeingDragged = draggedTaskId === task.id;
 
                   return (
@@ -5700,10 +5975,18 @@ function KanbanView({
                         <span className="mr-1 text-xs text-slate-500">{itemNumber(task.id)}</span>{task.title}
                       </h4>
 
-                      {depTask && (
-                        <div className="text-[10px] text-indigo-800 dark:text-indigo-300 bg-white/70 dark:bg-slate-900/70 px-2 py-1 rounded-lg flex items-center gap-1 truncate">
+                      {depTasks.length > 0 && (
+                        <div
+                          title={`Waits for: ${depTasks.map((d) => d.title).join(', ')}`}
+                          className="text-[10px] text-indigo-800 dark:text-indigo-300 bg-white/70 dark:bg-slate-900/70 px-2 py-1 rounded-lg flex items-center gap-1 truncate"
+                        >
                           <GitBranch className="w-3 h-3 shrink-0" />
-                          <span className="truncate">Waits for: {depTask.title}</span>
+                          <span className="truncate">
+                            Waits for:{' '}
+                            {depTasks.length === 1
+                              ? depTasks[0].title
+                              : `${depTasks.length} tasks (${depTasks.map((d) => d.title).join(', ')})`}
+                          </span>
                         </div>
                       )}
 
@@ -6300,7 +6583,8 @@ function NewTaskModal({ noteDraft, initialProjectId, initialProductId, productLi
   const [extraHoursPerDay, setExtraHoursPerDay] = useState(0);
   const [fridayHours, setFridayHours] = useState(0);
   const [saturdayHours, setSaturdayHours] = useState(0);
-  const [dependsOnId, setDependsOnId] = useState('');
+  const [dependsOnIds, setDependsOnIds] = useState([]);
+  const [depCandidateId, setDepCandidateId] = useState('');
 
   return (
     <div
@@ -6471,22 +6755,53 @@ function NewTaskModal({ noteDraft, initialProjectId, initialProductId, productLi
 
           <div>
             <label className="font-semibold text-slate-500 block mb-1">
-              Wait for this task to finish first (Optional Dependency)
+              Wait for these tasks to finish first (Optional Prerequisites — {dependsOnIds.length})
             </label>
-            <select
-              value={dependsOnId}
-              onChange={(e) => setDependsOnId(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-stone-100 dark:bg-slate-800"
-            >
-              <option value="">— No prerequisite —</option>
-              {tasks
-                .filter((t) => t.project_id === projectId)
-                .map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title} (Ends {t.due_date})
-                  </option>
-                ))}
-            </select>
+            {dependsOnIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {dependsOnIds.map((pid) => {
+                  const pt = tasks.find((t) => t.id === pid);
+                  return (
+                    <span
+                      key={pid}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[11px] font-semibold"
+                    >
+                      <span>{pt?.title || pid}</span>
+                      <button
+                        type="button"
+                        onClick={() => setDependsOnIds((prev) => prev.filter((id) => id !== pid))}
+                        className="text-rose-500 hover:text-rose-700 font-bold ml-1"
+                        title="Remove prerequisite"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            <div className="flex items-center gap-1.5">
+              <select
+                value={depCandidateId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val && !dependsOnIds.includes(val)) {
+                    setDependsOnIds((prev) => [...prev, val]);
+                  }
+                  setDepCandidateId('');
+                }}
+                className="flex-1 px-3 py-2 rounded-xl bg-stone-100 dark:bg-slate-800"
+              >
+                <option value="">— Add a prerequisite task —</option>
+                {tasks
+                  .filter((t) => t.project_id === projectId && !dependsOnIds.includes(t.id))
+                  .map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title} (Ends {t.due_date || '—'})
+                    </option>
+                  ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -6505,8 +6820,24 @@ function NewTaskModal({ noteDraft, initialProjectId, initialProductId, productLi
                 friday_hours: Math.max(0, Math.min(16, Number(fridayHours) || 0)),
                 saturday_hours: Math.max(0, Math.min(16, Number(saturdayHours) || 0)),
               };
-              const snappedStart = snapToTaskWorkingDay(workSchedule, startDate);
+              let effectiveStart = startDate;
+              if (dependsOnIds.length > 0) {
+                let maxPrereqEnd = null;
+                dependsOnIds.forEach((pid) => {
+                  const pt = tasks.find((t) => t.id === pid);
+                  const pEnd = pt ? getEffectiveEndDate(pt) : null;
+                  if (pEnd && (!maxPrereqEnd || pEnd > maxPrereqEnd)) {
+                    maxPrereqEnd = pEnd;
+                  }
+                });
+                if (maxPrereqEnd && (!effectiveStart || effectiveStart <= maxPrereqEnd)) {
+                  effectiveStart = addCalendarDays(maxPrereqEnd, 1);
+                }
+              }
+              const snappedStart = snapToTaskWorkingDay(workSchedule, effectiveStart);
               const computedDue = addTaskDays(workSchedule, snappedStart, pDays);
+              const lookup = new Map(tasks.map((t) => [t.id, t]));
+              const depFields = buildDependencyFields(dependsOnIds, true, lookup);
               const task = {
                 id: `task-${Date.now()}`,
                 project_id: projectId,
@@ -6522,8 +6853,7 @@ function NewTaskModal({ noteDraft, initialProjectId, initialProductId, productLi
                 ...workSchedule,
                 actual_days: 0,
                 blocked_days: 0,
-                depends_on_id: dependsOnId || null,
-                dependencies_enabled: true,
+                ...depFields,
                 status,
                 blocked_reason: '',
                 approved_by: '',
