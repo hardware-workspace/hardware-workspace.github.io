@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Calculator, Cpu, Eraser, Layers, Maximize2, Minimize2, PenTool, RotateCcw, Trash2, Undo2, Wrench, Zap } from 'lucide-react';
+import { Calculator, Cpu, Eraser, Layers, Maximize2, Minimize2, PenTool, RotateCcw, StickyNote, Trash2, Undo2, Wrench, Zap } from 'lucide-react';
 import SignalPulse from './SignalPulse';
 import ScientificCalculator from './ScientificCalculator';
+import PersonalNotes, { type PersonalNote } from './PersonalNotes';
 
 const PEN_CURSOR = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M3 27 7 17 22 2l8 8-15 15z" fill="#f7d68a" stroke="#172033" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 17 22 2l8 8-15 15z" fill="#2563eb" stroke="#172033" stroke-width="1.5" stroke-linejoin="round"/><path d="m3 27 4-10 6 6z" fill="#fff4dc" stroke="#172033" stroke-width="1.5"/><path d="m3 27 2-5 3 3z" fill="#172033"/></svg>')}`;
 const ERASER_CURSOR = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M3 23 19 4q2-2 4 0l6 6q2 2 0 4L14 29H8z" fill="#f9a8d4" stroke="#172033" stroke-width="1.5" stroke-linejoin="round"/><path d="m8 17 9 9-3 3H8l-5-6z" fill="#e2e8f0" stroke="#172033" stroke-width="1.5"/></svg>')}`;
@@ -541,8 +542,12 @@ function FreehandScratchpad() {
   );
 }
 
-export default function HardwareToolsView() {
-  const [activeTool, setActiveTool] = useState<'all' | 'voltage_divider' | 'scientific_calculator'>('all');
+export default function HardwareToolsView({ accountId, canConvertNotes, onConvertNote }: {
+  accountId: string;
+  canConvertNotes: boolean;
+  onConvertNote: (note: PersonalNote) => void;
+}) {
+  const [activeTool, setActiveTool] = useState<'all' | 'voltage_divider' | 'scientific_calculator' | 'notes'>('all');
   const [vs, setVs] = useState('');
   const [r1, setR1] = useState('');
   const [r2, setR2] = useState('');
@@ -680,9 +685,10 @@ export default function HardwareToolsView() {
 
         <div className="flex flex-wrap items-center gap-2">
           {[
-            { id: 'all' as const, label: 'All Tools (2)', icon: Layers },
+            { id: 'all' as const, label: 'All Tools (3)', icon: Layers },
             { id: 'voltage_divider' as const, label: '1. Voltage Divider Calculator', icon: Zap },
             { id: 'scientific_calculator' as const, label: '2. Scientific Calculator', icon: Calculator },
+            { id: 'notes' as const, label: '3. Notes', icon: StickyNote },
           ].map((tool) => {
             const Icon = tool.icon;
             const selected = activeTool === tool.id;
@@ -1034,6 +1040,10 @@ export default function HardwareToolsView() {
           </div>
         </div>
       </section>
+      )}
+
+      {(activeTool === 'all' || activeTool === 'notes') && (
+        <PersonalNotes accountId={accountId} canConvert={canConvertNotes} onConvert={onConvertNote} />
       )}
     </div>
   );

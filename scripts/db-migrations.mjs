@@ -13,18 +13,19 @@ if (!process.env.SUPABASE_ACCESS_TOKEN) {
   console.error('FAIL: Set SUPABASE_ACCESS_TOKEN privately in your shell or GitHub Actions secrets.');
   process.exit(2);
 }
-const cli = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'supabase.cmd' : 'supabase');
+const cli = path.join(root, 'node_modules', 'supabase', 'dist', 'supabase.js');
 function run(args) {
-  const result = spawnSync(cli, args, { cwd: root, stdio: 'inherit', shell: process.platform === 'win32', env: process.env });
+  const result = spawnSync(process.execPath, [cli, ...args], { cwd: root, stdio: 'inherit', env: process.env });
   if (result.error || result.status !== 0) {
     throw new Error(result.error?.message || `Supabase CLI exited ${result.status}`);
   }
 }
 try {
   const target = `--remote=${projectRef}`;
+  const includeEarlier = process.env.HARDWARE_DB_BASELINE_VERIFIED === projectRef ? ['--include-all'] : [];
   console.log(`Target: Supabase project ${projectRef}`);
   if (mode === 'status') run(['migration', 'list', target]);
-  if (mode === 'plan') run(['db', 'push', target, '--dry-run', '--skip-vault']);
+  if (mode === 'plan') run(['db', 'push', target, '--dry-run', '--skip-vault', ...includeEarlier]);
   if (mode === 'deploy') {
     if (process.env.HARDWARE_DB_DEPLOY !== projectRef) {
       throw new Error(`Set HARDWARE_DB_DEPLOY=${projectRef} for an explicit production migration run.`);
@@ -33,8 +34,8 @@ try {
       throw new Error('Production migration history must be reconciled first. Set HARDWARE_DB_BASELINE_VERIFIED to the project reference only after verifying the baseline.');
     }
     run(['migration', 'list', target]);
-    run(['db', 'push', target, '--dry-run', '--skip-vault']);
-    run(['db', 'push', target, '--skip-vault', '--yes']);
+    run(['db', 'push', target, '--dry-run', '--skip-vault', ...includeEarlier]);
+    run(['db', 'push', target, '--skip-vault', '--yes', ...includeEarlier]);
     run(['migration', 'list', target]);
   }
   console.log(`PASS: database ${mode} completed for ${projectRef}.`);

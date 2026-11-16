@@ -5,6 +5,7 @@ import AccountSettings from './AccountSettings';
 import Dashboard from './Dashboard';
 import EmailPreferences from './EmailPreferences';
 import HardwareToolsView from './HardwareToolsView';
+import { noteToTaskTitle } from './noteTitle';
 import { realAccount } from './taskEmails';
 import { supabase } from './supabaseClient';
 import { escapeCsvCell } from './security';
@@ -1070,9 +1071,11 @@ export default function App({ account, onSignOut }) {
   const [doneTransitionModalState, setDoneTransitionModalState] = useState(null);
   const [createHierarchyModalOpen, setCreateHierarchyModalOpen] = useState(false);
   const [newTaskModalOpen, setNewTaskModalOpen] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(null);
   const [creationTarget, setCreationTarget] = useState(null);
   const [groupMenu, setGroupMenu] = useState(null);
   useEffect(() => {
+    if (!newTaskModalOpen) setNoteDraft(null);
     if (!newTaskModalOpen && !createHierarchyModalOpen) setCreationTarget(null);
   }, [newTaskModalOpen, createHierarchyModalOpen]);
   const appendTask = (task) => setTasks(previous => {
@@ -2444,7 +2447,15 @@ export default function App({ account, onSignOut }) {
 
           {activeTab === 'tools' && (
             <div className="flex-1 overflow-y-auto pr-1">
-              <HardwareToolsView />
+              <HardwareToolsView
+                accountId={currentUser.id}
+                canConvertNotes={currentUser.role === 'manager' || currentUser.role === 'member'}
+                onConvertNote={(note) => {
+                  setNoteDraft({ id: note.id, title: noteToTaskTitle(note.body), description: note.body, assigneeId: currentUser.id });
+                  setNewTaskDefaultStatus('backlog');
+                  setNewTaskModalOpen(true);
+                }}
+              />
             </div>
           )}
 
@@ -2978,8 +2989,9 @@ export default function App({ account, onSignOut }) {
         {/* ==================================================================== */}
         {/* NEW TASK MODAL (Planned Days, Weight 1-10, Dependency Link) */}
         {/* ==================================================================== */}
-        {newTaskModalOpen && currentUser.role === 'manager' && (
+        {newTaskModalOpen && (currentUser.role === 'manager' || (currentUser.role === 'member' && noteDraft)) && (
           <NewTaskModal
+            noteDraft={noteDraft}
             initialProjectId={creationTarget?.projectId}
             initialProductId={creationTarget?.productId}
             productLines={productLines.filter(project => !project.archived)}
@@ -2988,10 +3000,16 @@ export default function App({ account, onSignOut }) {
             users={users}
             currentUser={currentUser}
             defaultStatus={newTaskDefaultStatus}
-            onClose={() => setNewTaskModalOpen(false)}
-            onCreate={(newTask) => {
-              appendTask(newTask);
+            onClose={() => { setNewTaskModalOpen(false); setNoteDraft(null); }}
+            onCreate={async (newTask) => {
+              if (noteDraft && currentUser.role === 'member' && shared && supabase) {
+                const { error } = await supabase.rpc('create_task_from_note', { note_id: noteDraft.id, task_data: newTask });
+                if (error) throw error;
+              } else {
+                appendTask(newTask);
+              }
               setNewTaskModalOpen(false);
+              setNoteDraft(null);
               pushToast('success', 'Task Created', `"${newTask.title}" added.`);
             }}
           />
@@ -6211,13 +6229,15 @@ function CreateProjectProductModal({ initialProjectId, productLines, onClose, on
 // ============================================================================
 // NEW TASK MODAL
 // ============================================================================
-function NewTaskModal({ initialProjectId, initialProductId, productLines, projects, tasks, users, currentUser, defaultStatus, onClose, onCreate }) {
+function NewTaskModal({ noteDraft, initialProjectId, initialProductId, productLines, projects, tasks, users, currentUser, defaultStatus, onClose, onCreate }) {
   const [selectedPlId, setSelectedPlId] = useState(initialProjectId || productLines[0]?.id || '');
   const availableProducts = projects.filter((p) => !p.archived && p.product_line_id === selectedPlId);
   const [projectId, setProjectId] = useState(initialProductId || availableProducts[0]?.id || projects[0]?.id || '');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [assigneeId, setAssigneeId] = useState('');
+  const [title, setTitle] = useState(noteDraft?.title || '');
+  const [description, setDescription] = useState(noteDraft?.description || '');
+  const [assigneeId, setAssigneeId] = useState(noteDraft?.assigneeId || '');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [priority, setPriority] = useState(2);
   const [criticality, setCriticality] = useState('high');
   const [weight, setWeight] = useState(10);
@@ -6417,12 +6437,14 @@ function NewTaskModal({ initialProjectId, initialProductId, productLines, projec
           </div>
         </div>
 
+        {saveError && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">{saveError}</p>}
         <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-semibold bg-stone-100 dark:bg-slate-800">
+          <button onClick={onClose} disabled={saving} className="px-4 py-2 rounded-xl text-xs font-semibold bg-stone-100 dark:bg-slate-800 disabled:opacity-50">
             Cancel
           </button>
           <button
-            onClick={() => {
+            disabled={saving || !title.trim() || !projectId}
+            onClick={async () => {
               if (!title.trim()) return;
               const pDays = Math.max(0.5, Number(plannedDays) || 1);
               const workSchedule = {
@@ -6432,12 +6454,12 @@ function NewTaskModal({ initialProjectId, initialProductId, productLines, projec
               };
               const snappedStart = snapToTaskWorkingDay(workSchedule, startDate);
               const computedDue = addTaskDays(workSchedule, snappedStart, pDays);
-              onCreate({
+              const task = {
                 id: `task-${Date.now()}`,
                 project_id: projectId,
                 title: title.trim(),
                 details: description.trim(),
-                assignee_id: (projects.find(product => product.id === projectId)?.assignee_ids?.length === 1 ? projects.find(product => product.id === projectId).assignee_ids[0] : assigneeId) || null,
+                assignee_id: noteDraft ? assigneeId || null : (projects.find(product => product.id === projectId)?.assignee_ids?.length === 1 ? projects.find(product => product.id === projectId).assignee_ids[0] : assigneeId) || null,
                 priority,
                 criticality,
                 weight,
@@ -6453,16 +6475,25 @@ function NewTaskModal({ initialProjectId, initialProductId, productLines, projec
                 blocked_reason: '',
                 approved_by: '',
                 time_spent_note: '',
-                position: 1,
+                position: Math.max(0, ...tasks.filter(existing => existing.project_id === projectId).map(existing => Number(existing.position) || 0)) + 1,
                 created_by: currentUser.id,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
                 completed_at: null,
-              });
+              };
+              setSaving(true);
+              setSaveError('');
+              try {
+                await onCreate(task);
+              } catch (error) {
+                setSaveError(error?.message || 'Could not create the task. Please try again.');
+              } finally {
+                setSaving(false);
+              }
             }}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white"
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
           >
-            Create Task
+            {saving ? 'Creating…' : 'Create Task'}
           </button>
         </div>
       </div>

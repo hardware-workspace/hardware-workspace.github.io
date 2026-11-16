@@ -1,5 +1,9 @@
 # Latest handoff
 
+## 16 November 2026 — Private Notes and task conversion
+
+Added a third Tools section, Notes, with create/edit/delete and a Convert to Task action. Notes use `public.personal_notes` with owner-only RLS. Conversion opens the existing task form with a short generated title, the full note in its description, and the note owner preselected as assignee; that choice can be changed. Members use a narrow `create_task_from_note` RPC because general shared-workspace task creation remains restricted. Viewers can manage private notes but remain unable to create shared tasks. Notes are retained after conversion. Added `src/PersonalNotes.tsx`, `src/noteTitle.js`, `supabase/migrations/202611160001_personal_notes.sql`, and scoped wiring in App/Tools. Fixed Windows paths in `scripts/db-migrations.mjs` and added guarded handling for verified older migrations. `npm run check:focused`, `npm run build`, and title examples passed. Database migration status/plan/deploy passed; production RLS, grants, and function existence were checked read-only. Frontend publish and live verification are pending. Next step: publish and verify Pages, then take the user's next request.
+
 ## 15 November 2026 — Clock hierarchy
 
 Enlarged the Gantt time to 3xl/4xl and placed it above the smaller date, aligned right. The time retains the white-to-cyan gradient; Cairo formatting is unchanged. `npm run build` and diff check passed. Commit `b3d4eac` was pushed to `main`; `npm run deploy:verify` confirmed production serves it and its JavaScript entrypoint. Next step: take the user's next request.

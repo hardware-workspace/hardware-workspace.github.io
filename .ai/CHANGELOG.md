@@ -1,5 +1,7 @@
 # Meaningful development changes
 
+- 16 November 2026: Added private, account-specific Notes with a prefilled Convert to Task flow and a guarded member conversion endpoint. Reconciled migration history and deployed owner-only Notes storage.
+
 - 15 November 2026: Added three selectable scientific calculator layouts with larger controls and direct shortcuts, sharing the existing calculation engine.
 
 - 10 November 2026: Added provider-independent agent instructions and shared session memory. No application or database behavior changed.
