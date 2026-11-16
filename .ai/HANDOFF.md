@@ -1,5 +1,9 @@
 # Latest handoff
 
+## 16 November 2026 — Blocked tasks no longer count toward daily weight totals
+
+Excluded `status === 'blocked'` tasks from both daily-weight calculations in `src/App.tsx`: the Gantt Daily Person Capacity Overlay (`dailyOverlayData`) now skips them like done tasks, so they add nothing to per-assignee totals, the all-assignee day total, the busiest-member max, or the tooltip task lists; Team Workload member cards' `todayWeight` badge also ignores blocked tasks active today. `npm run check:focused` and `npm run build` passed. Commit `71fbdcd` (it also carries a pre-existing no-op line-ending normalization in `src/EmailPreferences.tsx` swept by the publisher's `git add -u`) was pushed to `main`; `node scripts/verify-deployment.mjs` confirmed production serves that commit and its JavaScript entrypoint. Next step: take the user's next request.
+
 ## 16 November 2026 — Gantt Hide/Show Done tasks toggle
 
 Added a persistent `Hide Done` / `Show Done` toggle button (showing the done task count on desktop, compact label on mobile) in the Gantt `TASKS` sticky header column (`src/App.tsx`), filtering `status === 'done'` tasks in `GanttView` (`localStorage` key `gantt-hide-done-tasks`) with an interactive restore prompt in the empty state.

@@ -6,6 +6,7 @@
 - The detailed handoff guide predates recent Gantt releases; use current code and Git history for those features. Existing release and migration guards remain in place.
 - Known deployment constraint: earlier SQL Editor changes may not appear in Supabase migration history. Reconcile before any database workflow deployment.
 - Gantt project and product rows support manager drag ordering; task rows can be sorted locally by date, status, or name. The eligible assignee directory refreshes while the app is open.
+- Blocked tasks do not add to daily weight totals: the Gantt capacity overlay and the Team Workload today-weight badges exclude `status === 'blocked'` tasks (commit `71fbdcd`).
 - The Gantt controls show a live Cairo clock with large 12-hour hh:mm:ss AM/PM time above a smaller DD/MM/YYYY date.
 - The Tools scientific calculator offers Classic, Explorer, and Modern keypad layouts. They share the existing calculation engine; the selected layout is saved in the browser.
 - The Notes tool stores each signed-in user's notes in `public.personal_notes`, protected by owner-only RLS. Managers and members can open a prefilled task from a note; viewers can keep private notes but cannot create shared tasks. The note remains after conversion.
