@@ -1,5 +1,7 @@
 # Meaningful development changes
 
+- 16 November 2026: Added a persistent Hide/Show Done tasks toggle button in the Gantt `TASKS` column header (`src/App.tsx`).
+
 - 16 November 2026: Built a full native interactive Online Smith Chart & RF impedance matching module in `src/SmithChartTool.tsx` (with optional `onlinesmithchart.com` frame/external link).
 
 - 16 November 2026: Reworked the workspace header to reflow at different browser zoom levels and added Online Smith Chart as the fourth Tool.

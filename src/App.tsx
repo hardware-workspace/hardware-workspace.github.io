@@ -3375,6 +3375,15 @@ function GanttView({
     localStorage.setItem('gantt-column-width', String(columnWidth));
     localStorage.setItem('gantt-column-locked', String(columnLocked));
   }, [columnWidth, columnLocked]);
+  const [hideDoneTasks, setHideDoneTasks] = useState(() => localStorage.getItem('gantt-hide-done-tasks') === 'true');
+  useEffect(() => {
+    localStorage.setItem('gantt-hide-done-tasks', String(hideDoneTasks));
+  }, [hideDoneTasks]);
+  const doneTaskCount = useMemo(() => tasks.filter((t) => t.status === 'done').length, [tasks]);
+  const visibleGanttTasks = useMemo(
+    () => (hideDoneTasks ? tasks.filter((t) => t.status !== 'done') : tasks),
+    [tasks, hideDoneTasks]
+  );
   const [panelHeight, setPanelHeight] = useState(null);
   const panelRef = useRef(null);
   const resizeStart = useRef(null);
@@ -3592,7 +3601,7 @@ function GanttView({
           .filter((p) => p.product_line_id === pl.id && !p.archived)
           .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0))
           .map((proj) => {
-            const projTasks = tasks
+            const projTasks = visibleGanttTasks
               .filter((t) => t.project_id === proj.id)
               .sort(compareTasks);
             return { ...proj, tasks: projTasks };
@@ -3605,7 +3614,7 @@ function GanttView({
       .filter((pl) => !pl.archived && (showEmptyGroups || pl.totalTasks > 0));
 
     return groups;
-  }, [productLines, projects, tasks, showEmptyGroups, taskSort]);
+  }, [productLines, projects, visibleGanttTasks, showEmptyGroups, taskSort]);
 
   // Flatten visible rows for SVG dependency wire coordinates
   const visibleTaskRows = useMemo(() => {
@@ -3918,7 +3927,7 @@ function GanttView({
             <Minimize2 className="w-3.5 h-3.5 text-slate-500" />
             <span>{collapseLabel}</span>
           </button>
-          {onBulkStatusChange && <button type="button" className="rounded-lg border border-stone-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900 text-slate-700 dark:text-slate-200 px-2 py-1" onClick={() => setCheckedTasks(checkedTasks.length ? [] : tasks.filter(task => canEditTask(task)).map(task => task.id))}>{checkedTasks.length ? 'Clear selection' : 'Select all filtered tasks'}</button>}
+          {onBulkStatusChange && <button type="button" className="rounded-lg border border-stone-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900 text-slate-700 dark:text-slate-200 px-2 py-1" onClick={() => setCheckedTasks(checkedTasks.length ? [] : visibleGanttTasks.filter(task => canEditTask(task)).map(task => task.id))}>{checkedTasks.length ? 'Clear selection' : 'Select all filtered tasks'}</button>}
           {onBulkStatusChange && checkedTasks.length > 0 && <div className="flex flex-wrap items-center gap-2">
             <select aria-label="Status for selected tasks" value={bulkStatus} onChange={event => setBulkStatus(event.target.value)} className="rounded-lg border px-2 py-1 dark:bg-slate-900">
               {Object.entries(STATUS_META).map(([status, meta]) => <option key={status} value={status}>{meta.label}</option>)}
@@ -4120,18 +4129,46 @@ function GanttView({
             <div className="flex sticky top-0 z-40 bg-stone-100 dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 shadow-xs h-16">
               <div
                 style={{ width: `${leftColWidth}px` }}
-                className="circuit-strip shrink-0 sticky left-0 z-50 bg-stone-100 dark:bg-slate-800 px-4 py-2 font-bold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-300 border-r-2 border-stone-300 dark:border-slate-700 flex items-center justify-between shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
+                className="circuit-strip shrink-0 sticky left-0 z-50 bg-stone-100 dark:bg-slate-800 px-2.5 sm:px-3.5 py-2 font-bold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-300 border-r-2 border-stone-300 dark:border-slate-700 flex items-center justify-between gap-1.5 sm:gap-2 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
               >
-                <span>Tasks</span>
-                <span className="hidden md:inline text-[10px] normal-case tracking-normal font-medium text-slate-500 dark:text-slate-400 max-w-[230px] text-right">
-                  Dashed: actual duration · Striped: blocked time
-                </span>
-              {!compactTimeline && <button type="button" aria-pressed={columnLocked}
-                  title={columnLocked ? 'Unlock task column width' : 'Lock task column width'}
-                  onClick={() => setColumnLocked(previous => !previous)}
-                  className="ml-1 shrink-0 rounded p-0.5 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors">
-                  {columnLocked ? <Lock size={13} /> : <Unlock size={13} />}
-                </button>}
+                <div className="min-w-0 flex flex-col justify-center">
+                  <span>Tasks</span>
+                  {!compactTimeline && (
+                    <span className="hidden md:block text-[10px] normal-case tracking-normal font-medium text-slate-500 dark:text-slate-400 truncate">
+                      Dashed: actual duration · Striped: blocked time
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    aria-pressed={hideDoneTasks}
+                    onClick={() => setHideDoneTasks((prev) => !prev)}
+                    title={hideDoneTasks ? 'Show completed (Done) tasks' : 'Hide completed (Done) tasks'}
+                    className={`inline-flex items-center gap-1 rounded-lg px-1.5 sm:px-2 py-1 text-[10px] sm:text-[11px] normal-case tracking-normal font-semibold border transition-all ${
+                      hideDoneTasks
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs hover:bg-indigo-700'
+                        : 'bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 border-stone-300 dark:border-slate-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300'
+                    }`}
+                  >
+                    {hideDoneTasks ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                    <span>
+                      {compactTimeline
+                        ? hideDoneTasks
+                          ? 'Show Done'
+                          : 'Hide Done'
+                        : hideDoneTasks
+                        ? `Show Done (${doneTaskCount})`
+                        : `Hide Done (${doneTaskCount})`}
+                    </span>
+                  </button>
+                  {!compactTimeline && <button type="button" aria-pressed={columnLocked}
+                    title={columnLocked ? 'Unlock task column width' : 'Lock task column width'}
+                    onClick={() => setColumnLocked(previous => !previous)}
+                    className="shrink-0 rounded p-1 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors">
+                    {columnLocked ? <Lock size={13} /> : <Unlock size={13} />}
+                  </button>}
+                </div>
                 {!compactTimeline && !columnLocked && <span {...resizeHandle('column')}
                   title="Drag to resize the task column" className="absolute inset-y-0 right-0 z-10 w-2 cursor-col-resize touch-none border-r-2 border-indigo-300 hover:bg-indigo-400 focus:bg-indigo-400" />}
               </div>
@@ -4346,9 +4383,23 @@ function GanttView({
               )}
 
               {groupedHierarchy.length === 0 ? (
-                <div className="py-16 text-center">
+                <div className="py-16 text-center space-y-2.5">
                   <Sparkles className="w-10 h-10 text-indigo-400 mx-auto mb-2" />
-                  <p className="font-semibold text-base">No tasks match your active filters</p>
+                  <p className="font-semibold text-base">
+                    {hideDoneTasks && doneTaskCount > 0
+                      ? 'All matching tasks are marked Done and currently hidden'
+                      : 'No tasks match your active filters'}
+                  </p>
+                  {hideDoneTasks && doneTaskCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setHideDoneTasks(false)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Show Done ({doneTaskCount})</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 groupedHierarchy.map((pl) => {

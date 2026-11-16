@@ -1,5 +1,9 @@
 # Latest handoff
 
+## 16 November 2026 — Gantt Hide/Show Done tasks toggle
+
+Added a persistent `Hide Done` / `Show Done` toggle button (showing the done task count on desktop, compact label on mobile) in the Gantt `TASKS` sticky header column (`src/App.tsx`), filtering `status === 'done'` tasks in `GanttView` (`localStorage` key `gantt-hide-done-tasks`) with an interactive restore prompt in the empty state.
+
 ## 16 November 2026 — Native Interactive Smith Chart Module
 
 Upgraded Tool 4 (`src/SmithChartTool.tsx`) from a frame-only wrapper to a full native interactive RF Online Smith Chart & impedance-matching workspace (`Interactive Smith Chart`), while preserving an optional tab to view the embedded `onlinesmithchart.com` frame or open the site externally. Implemented interactive SVG Z/Y/VSWR/constant-Q contours, hover probe coordinates, click/drag load (`DP 1`) placement, Black Box load sliders, cascading matching network components (series/shunt `C`, `L`, `R`, transmission lines, open/shorted stubs, ideal transformers) with real-time sliders, frequency span dispersion curves, one-click analytical L-network match synthesis, and a full `DP 1..N` RF metrics table.
