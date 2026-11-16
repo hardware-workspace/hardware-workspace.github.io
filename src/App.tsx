@@ -1968,9 +1968,9 @@ export default function App({ account, onSignOut }) {
                         maskImage: 'linear-gradient(to right, #000 0%, rgba(0,0,0,0.4) 45%, transparent 100%)',
                       }}
                     />
-          <div className="relative flex flex-col sm:flex-row items-center justify-between gap-2.5">
+          <div className="workspace-header-layout relative grid grid-cols-1 items-center gap-x-3 gap-y-2 xl:grid-cols-[minmax(0,1fr)_auto]">
             {/* Brand & Main Navigation Tabs */}
-            <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+            <div className="workspace-header-primary flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
               <div className="flex items-center gap-2.5 min-h-9">
                 <div>
                   <div className="flex items-center gap-1.5">
@@ -1986,7 +1986,7 @@ export default function App({ account, onSignOut }) {
               </div>
 
               {/* Mobile menu toggle or compact nav */}
-              <nav aria-label="Workspace navigation" className="hidden md:flex items-center gap-1 bg-stone-100/90 dark:bg-slate-800/90 ring-1 ring-cyan-500/20 p-1 rounded-xl overflow-x-auto max-w-full">
+              <nav aria-label="Workspace navigation" className="hidden min-w-0 max-w-full items-center gap-1 overflow-x-auto rounded-xl bg-stone-100/90 p-1 ring-1 ring-cyan-500/20 dark:bg-slate-800/90 md:flex">
                 {[
                   { id: 'dashboard', label: 'Dashboard', icon: Activity },
                   { id: 'gantt', label: 'Gantt', icon: Calendar },
@@ -2018,7 +2018,7 @@ export default function App({ account, onSignOut }) {
               {workspace.ready && (
                 <div
                   aria-label="Task counts"
-                  className="inline-flex items-center gap-0.5 rounded-lg bg-stone-100/90 dark:bg-slate-800/90 ring-1 ring-cyan-500/20 px-2 py-1 text-[11px] font-bold shrink-0"
+                  className="flex max-w-full min-w-0 flex-wrap items-center gap-0.5 rounded-lg bg-stone-100/90 px-2 py-1 text-[11px] font-bold ring-1 ring-cyan-500/20 dark:bg-slate-800/90"
                 >
                   {kpiStats.map((k, idx) => (
                     <React.Fragment key={k.id}>
@@ -2048,7 +2048,7 @@ export default function App({ account, onSignOut }) {
             </div>
 
             {/* Right Actions */}
-            <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end flex-wrap">
+            <div className="workspace-header-actions flex min-w-0 flex-wrap items-center justify-end gap-1.5">
               {undoHistory.length > 0 && (
                 <button
                   onClick={handleUndo}

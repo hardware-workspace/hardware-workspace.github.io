@@ -17,7 +17,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid #6366f1; outline-offs
   .workspace-header { padding-top: max(8px, env(safe-area-inset-top)); }
   .workspace-header > div { gap: 4px; }
   .workspace-header button { min-height: 40px; }
-  .workspace-header > div > div:last-child { flex-wrap: nowrap; justify-content: flex-start; }
+  .workspace-header-actions { flex-wrap: wrap; justify-content: flex-start; }
   .workspace-header h1 { font-size: 15px; }
   .mobile-bottom-nav button { min-height: 58px; }
   .workspace-main { padding-bottom: 8px; }
