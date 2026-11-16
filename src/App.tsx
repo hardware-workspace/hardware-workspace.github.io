@@ -3528,7 +3528,8 @@ function GanttView({
     });
 
     allTasks.forEach((t) => {
-      if (!t.start_date || !t.due_date || !t.assignee_id || t.status === 'done') return;
+      // Blocked tasks don't consume daily capacity, so they never add to day totals.
+      if (!t.start_date || !t.due_date || !t.assignee_id || t.status === 'done' || t.status === 'blocked') return;
       const w = Number(t.weight) || 5;
       const endIso = getEffectiveEndDate(t) || t.due_date;
       daysArray.forEach((d) => {
@@ -5802,6 +5803,7 @@ function TeamWorkloadView({ users, tasks, onSelectMember }) {
             .filter(
               (t) =>
                 t.status !== 'done' &&
+                t.status !== 'blocked' &&
                 t.start_date &&
                 t.due_date &&
                 t.start_date <= TODAY_CAIRO &&
