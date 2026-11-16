@@ -3373,7 +3373,7 @@ function GanttView({
   pushToast,
 }) {
   const [overlayMemberId, setOverlayMemberId] = useState('all');
-  const [taskSort, setTaskSort] = useState('position');
+  const [taskSort, setTaskSort] = useState('start_date');
   const suppressGroupClick = useRef(false);
   const [groupDrag, setGroupDrag] = useState<{
     kind: string; id: string; parentId?: string; name: string;
@@ -4017,10 +4017,10 @@ function GanttView({
               onChange={(event) => setTaskSort(event.target.value)}
               className="rounded-lg border border-stone-200 dark:border-slate-700 bg-stone-100 dark:bg-slate-800 px-2 py-1 text-[11px] font-semibold"
             >
-              <option value="position">Sort: Manual</option>
+              <option value="start_date">Sort: Start date</option>
               <option value="due_date">Sort: Planned end</option>
               <option value="completed_at">Sort: Completed</option>
-              <option value="start_date">Sort: Start date</option>
+              <option value="position">Sort: Manual</option>
               <option value="status">Sort: Status</option>
               <option value="title">Sort: Task name</option>
             </select>
@@ -4130,10 +4130,10 @@ function GanttView({
             Sort tasks
             <select aria-label="Sort Gantt tasks" value={taskSort} onChange={event => setTaskSort(event.target.value)}
               className="rounded-lg border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1">
-              <option value="position">Manual order</option>
+              <option value="start_date">Start date</option>
               <option value="due_date">Planned end date</option>
               <option value="completed_at">Completion date</option>
-              <option value="start_date">Start date</option>
+              <option value="position">Manual order</option>
               <option value="status">Status</option>
               <option value="title">Task name</option>
             </select>

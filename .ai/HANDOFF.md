@@ -1,5 +1,9 @@
 # Latest handoff
 
+## 16 November 2026 — Default Gantt task sorting by start date
+
+Changed the default Gantt task sort order (`taskSort` in `GanttView`, `src/App.tsx`) from `'position'` (`Manual order`) to `'start_date'` (`Start date`), and placed `Start date` first in both Gantt sort dropdowns.
+
 ## 16 November 2026 — Multiple task dependencies (multiple prerequisites & dependent tasks)
 
 Added support in `src/App.tsx` for linking a task to multiple prerequisite tasks (`Starts after`) and multiple dependent follow-up tasks (`Next tasks`). Tasks now schedule and auto-cascade after the latest effective end date across all linked prerequisites, require all prerequisites to be `Done` before transitioning to `Done`, render individual Gantt SVG dependency wires (with per-wire `×` unlinking and additive `●` drag-to-link), and allow adding/unlinking multiple prerequisites in `TaskDetailDrawer` and `NewTaskModal` while preserving full compatibility with `save_shared_workspace` and `create_task_from_note`.
