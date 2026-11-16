@@ -1,8 +1,12 @@
 # Latest handoff
 
+## 16 November 2026 — Native Interactive Smith Chart Module
+
+Upgraded Tool 4 (`src/SmithChartTool.tsx`) from a frame-only wrapper to a full native interactive RF Online Smith Chart & impedance-matching workspace (`Interactive Smith Chart`), while preserving an optional tab to view the embedded `onlinesmithchart.com` frame or open the site externally. Implemented interactive SVG Z/Y/VSWR/constant-Q contours, hover probe coordinates, click/drag load (`DP 1`) placement, Black Box load sliders, cascading matching network components (series/shunt `C`, `L`, `R`, transmission lines, open/shorted stubs, ideal transformers) with real-time sliders, frequency span dispersion curves, one-click analytical L-network match synthesis, and a full `DP 1..N` RF metrics table.
+
 ## 16 November 2026 — Header zoom layout and Smith chart
 
-The header now uses wrapping groups and a responsive two-column/single-column layout so brand, navigation, task counts, and actions reflow when browser zoom changes. Added Online Smith Chart as Tool 4 in an embedded, sandboxed frame with a direct full-page link. `npm run build` passed. No database changes. Production publish and verification are pending. Next step: publish and verify Pages, then take the user's next request.
+The header now uses wrapping groups and a responsive two-column/single-column layout so brand, navigation, task counts, and actions reflow when browser zoom changes. Added Online Smith Chart as Tool 4 in an embedded, sandboxed frame with a direct full-page link. Commit `5e2b94e` was pushed and verified live via `node scripts/verify-deployment.mjs`.
 
 ## 16 November 2026 — Private Notes and task conversion
 

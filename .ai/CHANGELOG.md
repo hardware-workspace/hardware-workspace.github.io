@@ -1,5 +1,7 @@
 # Meaningful development changes
 
+- 16 November 2026: Built a full native interactive Online Smith Chart & RF impedance matching module in `src/SmithChartTool.tsx` (with optional `onlinesmithchart.com` frame/external link).
+
 - 16 November 2026: Reworked the workspace header to reflow at different browser zoom levels and added Online Smith Chart as the fourth Tool.
 
 - 16 November 2026: Added private, account-specific Notes with a prefilled Convert to Task flow and a guarded member conversion endpoint. Reconciled migration history and deployed owner-only Notes storage.
