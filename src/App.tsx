@@ -1593,12 +1593,6 @@ export default function App({ account, onSignOut }) {
       return false;
     }
 
-    const assignedProduct = projectMap[existing.project_id];
-    if ('assignee_id' in patch && assignedProduct?.assignee_ids?.length === 1 && patch.assignee_id !== assignedProduct.assignee_ids[0]) {
-      pushToast('error', 'Product has one assignee', 'Change the product assignees first.');
-      return false;
-    }
-
     const cleanPatch = { ...patch };
     delete cleanPatch.depends_on_ids;
     const depFieldsChanged =
@@ -4513,7 +4507,7 @@ function GanttView({
                     width: `${totalDays * dayWidth}px`,
                     height: `${timelineRowsHeight}px`,
                   }}
-                  className="absolute top-0 overflow-hidden z-15 pointer-events-none"
+                  className="absolute top-0 overflow-hidden z-25 pointer-events-none"
                 >
                   <svg
                     width={totalDays * dayWidth}

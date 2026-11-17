@@ -1,5 +1,7 @@
 # Meaningful development changes
 
+- 17 November 2026: Raised Gantt dependency SVG wire overlay from `z-15` to `z-25` so wires appear *over* task bars. Removed the single-assignee product lock that blocked changing a task's assignee when the product had only one assignee.
+
 - 16 November 2026: Defaulted Gantt task sorting to `Start date` (`taskSort = 'start_date'`) in `src/App.tsx`.
 
 - 16 November 2026: Added multiple-dependency support (`src/App.tsx`) so tasks can wait for multiple prerequisite tasks to finish and link to multiple dependent tasks across the Gantt chart, Task Detail Drawer, and New Task modal.

@@ -1,5 +1,11 @@
 # Latest handoff
 
+## 17 November 2026 — Gantt dependency wires over task bars + remove single-assignee task lock
+
+1. **Gantt wire z-index raised** (`src/App.tsx`): Changed the dependency SVG overlay div from `z-15` to `z-25` so dependency connector wires render *above* task bars (which sit at `z-15`), while still staying below dragging bars (`z-30`). The overlay already has `pointer-events-none`; unlink `×` buttons inside remain interactive via `pointer-events-auto`.
+
+2. **Single-assignee lock removed** (`src/App.tsx`, lines ~1596–1600): Deleted the guard that blocked changing a task's `assignee_id` when the product had exactly one assignee (`'Product has one assignee'` toast). The product's single assignee still pre-fills new tasks as the default, but users can now freely change any task's assignee after creation.
+
 ## 16 November 2026 — Default Gantt task sorting by start date
 
 Changed the default Gantt task sort order (`taskSort` in `GanttView`, `src/App.tsx`) from `'position'` (`Manual order`) to `'start_date'` (`Start date`), and placed `Start date` first in both Gantt sort dropdowns.
