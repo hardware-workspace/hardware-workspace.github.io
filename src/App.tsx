@@ -4499,72 +4499,6 @@ function GanttView({
                 </div>
               )}
 
-              {/* SVG Dependency Connector Wires Layer (Strictly positioned inside the right-side timeline track so it NEVER overlaps the left sticky column) */}
-              {showDependencyArrows && dependencyPaths.length > 0 && (
-                <div
-                  style={{
-                    left: `${leftColWidth}px`,
-                    width: `${totalDays * dayWidth}px`,
-                    height: `${timelineRowsHeight}px`,
-                  }}
-                  className="absolute top-0 overflow-hidden z-25 pointer-events-none"
-                >
-                  <svg
-                    width={totalDays * dayWidth}
-                    height={timelineRowsHeight}
-                    className="overflow-hidden"
-                  >
-                    <defs>
-                      <marker
-                        id="dep-arrow"
-                        viewBox="0 0 10 10"
-                        refX="7"
-                        refY="5"
-                        markerWidth="6"
-                        markerHeight="6"
-                        orient="auto-start-reverse"
-                      >
-                        <path d="M 0 1 L 8 5 L 0 9 z" fill="#6366f1" />
-                      </marker>
-                    </defs>
-                    {dependencyPaths.map((w) => (
-                      <g key={w.id}>
-                        <path
-                          d={w.d}
-                          fill="none"
-                          stroke="#6366f1"
-                          strokeWidth="1.8"
-                          strokeDasharray="4 2"
-                          markerEnd="url(#dep-arrow)"
-                          opacity="0.85"
-                        />
-                        {/* Interactive Unlink (×) button right on the Gantt dependency wire */}
-                        <g
-                          transform={`translate(${w.labelX - 7}, ${w.labelY - 7})`}
-                          className="pointer-events-auto cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const childTask = taskMap[w.childTaskId];
-                            const remainingIds = getPrerequisiteIds(childTask).filter((id) => id !== w.parentTaskId);
-                            onUpdateTask(
-                              w.childTaskId,
-                              { depends_on_ids: remainingIds },
-                              { allowUndo: true, actionLabel: 'Removed dependency link' }
-                            );
-                            pushToast('info', 'Dependency Unlinked', 'Removed dependency wire on the Gantt chart.');
-                          }}
-                        >
-                          <circle cx="7" cy="7" r="7" fill="#ef4444" />
-                          <text x="7" y="10" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="bold">
-                            ×
-                          </text>
-                        </g>
-                      </g>
-                    ))}
-                  </svg>
-                </div>
-              )}
-
               {groupedHierarchy.length === 0 ? (
                 <div className="py-16 text-center space-y-2.5">
                   <Sparkles className="w-10 h-10 text-indigo-400 mx-auto mb-2" />
@@ -5013,6 +4947,73 @@ function GanttView({
                     </React.Fragment>
                   );
                 })
+              )}
+
+              {/* SVG Dependency Connector Wires Layer — rendered LAST so it stacks above all task bars */}
+              {showDependencyArrows && dependencyPaths.length > 0 && (
+                <div
+                  style={{
+                    left: `${leftColWidth}px`,
+                    width: `${totalDays * dayWidth}px`,
+                    height: `${timelineRowsHeight}px`,
+                    zIndex: 25,
+                  }}
+                  className="absolute top-0 overflow-hidden pointer-events-none"
+                >
+                  <svg
+                    width={totalDays * dayWidth}
+                    height={timelineRowsHeight}
+                    className="overflow-hidden"
+                  >
+                    <defs>
+                      <marker
+                        id="dep-arrow"
+                        viewBox="0 0 10 10"
+                        refX="7"
+                        refY="5"
+                        markerWidth="6"
+                        markerHeight="6"
+                        orient="auto-start-reverse"
+                      >
+                        <path d="M 0 1 L 8 5 L 0 9 z" fill="#6366f1" />
+                      </marker>
+                    </defs>
+                    {dependencyPaths.map((w) => (
+                      <g key={w.id}>
+                        <path
+                          d={w.d}
+                          fill="none"
+                          stroke="#6366f1"
+                          strokeWidth="1.8"
+                          strokeDasharray="4 2"
+                          markerEnd="url(#dep-arrow)"
+                          opacity="0.85"
+                        />
+                        {/* Interactive Unlink (×) button right on the Gantt dependency wire */}
+                        <g
+                          transform={`translate(${w.labelX - 7}, ${w.labelY - 7})`}
+                          className="pointer-events-auto cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const childTask = taskMap[w.childTaskId];
+                            const remainingIds = getPrerequisiteIds(childTask).filter((id) => id !== w.parentTaskId);
+                            onUpdateTask(
+                              w.childTaskId,
+                              { depends_on_ids: remainingIds },
+                              { allowUndo: true, actionLabel: 'Removed dependency link' }
+                            );
+                            pushToast('info', 'Dependency Unlinked', 'Removed dependency wire on the Gantt chart.');
+                          }}
+                        >
+                          <circle cx="7" cy="7" r="7" fill="#ef4444" />
+                          <text x="7" y="10" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="bold">
+                            ×
+                          </text>
+                        </g>
+                      </g>
+                    ))}
+                  </svg>
+                </div>
               )}
             </div>
           </div>
