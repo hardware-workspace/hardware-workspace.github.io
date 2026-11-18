@@ -2107,7 +2107,7 @@ export default function App({ account, onSignOut }) {
         {/* ==================================================================== */}
         {/* TOP NAVIGATION BAR */}
         {/* ==================================================================== */}
-        <header className="workspace-header relative overflow-hidden shrink-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-stone-200 dark:border-slate-800 px-3 lg:px-6 py-2">
+        <header className="workspace-header relative shrink-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-stone-200 dark:border-slate-800 px-3 lg:px-6 py-2">
           {/* Circuit-board banner: anchored top-left, fading out toward the right */}
           <div
             aria-hidden="true"
@@ -2262,7 +2262,7 @@ export default function App({ account, onSignOut }) {
                 </button>
 
                 {notifOpen && (
-                  <div className="notification-popover circuit-card absolute right-0 mt-2 w-80 sm:w-96 max-h-[28rem] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-stone-200 dark:border-slate-800 p-4 z-50">
+                  <div className="notification-popover circuit-card absolute right-0 top-full mt-2 w-80 sm:w-96 max-h-[28rem] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-stone-200 dark:border-slate-800 p-4 z-50">
                     <div className="flex items-center justify-between pb-3 border-b border-stone-100 dark:border-slate-800">
                       <div>
                         <h3 className="font-semibold text-sm">Notifications ({currentUser.name})</h3>

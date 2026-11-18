@@ -1,5 +1,9 @@
 # Latest handoff
 
+## 18 November 2026 — Notification bell popover visible again
+
+The bell's dropdown never appeared because the top `<header className="workspace-header …">` in `src/App.tsx` carried `overflow-hidden` (added with the circuit-board banner in `e2bbb80`), which clipped the absolutely positioned popover that hangs below the header. Removed `overflow-hidden` from the header (both decorative banner layers use `inset-y-0` and stay inside it) and added `top-full` to `.notification-popover` so it anchors directly under the bell instead of the wrapper's static position. Mobile styling (`position: fixed; top: 110px`) in `src/index.css` still overrides it. `npm run check:focused` and `npm run build` passed.
+
 ## 17 November 2026 — Gantt dependency wires over task bars + remove single-assignee task lock
 
 1. **Gantt wire z-index raised** (`src/App.tsx`): Changed the dependency SVG overlay div from `z-15` to `z-25` so dependency connector wires render *above* task bars (which sit at `z-15`), while still staying below dragging bars (`z-30`). The overlay already has `pointer-events-none`; unlink `×` buttons inside remain interactive via `pointer-events-auto`.

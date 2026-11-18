@@ -1,5 +1,7 @@
 # Meaningful development changes
 
+- 18 November 2026: Fixed the header notification bell being unresponsive-looking by removing the header's `overflow-hidden` (it clipped the popover) and anchoring the popover with `top-full` in `src/App.tsx`.
+
 - 17 November 2026: Raised Gantt dependency SVG wire overlay from `z-15` to `z-25` so wires appear *over* task bars. Removed the single-assignee product lock that blocked changing a task's assignee when the product had only one assignee.
 
 - 16 November 2026: Defaulted Gantt task sorting to `Start date` (`taskSort = 'start_date'`) in `src/App.tsx`.
