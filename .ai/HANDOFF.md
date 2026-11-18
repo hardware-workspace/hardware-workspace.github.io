@@ -2,7 +2,7 @@
 
 ## 18 November 2026 — Notification bell popover visible again
 
-The bell's dropdown never appeared because the top `<header className="workspace-header …">` in `src/App.tsx` carried `overflow-hidden` (added with the circuit-board banner in `e2bbb80`), which clipped the absolutely positioned popover that hangs below the header. Removed `overflow-hidden` from the header (both decorative banner layers use `inset-y-0` and stay inside it) and added `top-full` to `.notification-popover` so it anchors directly under the bell instead of the wrapper's static position. Mobile styling (`position: fixed; top: 110px`) in `src/index.css` still overrides it. `npm run check:focused` and `npm run build` passed.
+The bell's dropdown never appeared because the top `<header className="workspace-header …">` in `src/App.tsx` carried `overflow-hidden` (added with the circuit-board banner in `e2bbb80`), which clipped the absolutely positioned popover that hangs below the header. Removed `overflow-hidden` from the header (both decorative banner layers use `inset-y-0` and stay inside it) and added `top-full` to `.notification-popover` so it anchors directly under the bell instead of the wrapper's static position. Mobile styling (`position: fixed; top: 110px`) in `src/index.css` still overrides it. `npm run check:focused` and `npm run build` passed. Commit `3402446` was pushed to `main`; `npm run deploy:verify` confirmed production serves that commit and its JavaScript entrypoint.
 
 ## 17 November 2026 — Gantt dependency wires over task bars + remove single-assignee task lock
 
