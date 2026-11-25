@@ -1,5 +1,9 @@
 # Latest handoff
 
+## 25 November 2026 — Add browser tab favicon
+
+Added a custom hardware-themed SVG favicon at `public/favicon.svg` and linked it in `index.html` (`<link rel="icon" type="image/svg+xml" href="/favicon.svg" />`) so browser tabs display an icon instead of the default globe. `npm run build` passed.
+
 ## 25 November 2026 — Remove Excel Workbook Importer section from Settings
 
 Removed the `Excel Workbook Importer` (`Communication_TeaM_Test_updated.xlsx`) / `Open Dry-Run Review Report (175 Tasks)` card and its `1. Excel Import (17 Rules)` sub-tab from `SettingsView` in `src/App.tsx`, defaulting `subTab` to `'lines'` and renumbering the remaining Settings sub-tabs (`1. Projects & Products`, `2. Users & Roles`, `3. Email delivery`). `npm run check:focused` and `npm run build` passed.
