@@ -2629,9 +2629,6 @@ export default function App({ account, onSignOut }) {
                 users={users}
                 setUsers={setUsers}
                 tasks={tasks}
-                dryRunReport={dryRunReport}
-                setDryRunReport={setDryRunReport}
-                onOpenDryRunModal={() => setDryRunModalOpen(true)}
                 onExportCSV={handleExportCSV}
                 emailOutbox={emailOutbox}
                 pushToast={pushToast}
@@ -6172,13 +6169,11 @@ function SettingsView({
   users,
   setUsers,
   tasks,
-  dryRunReport,
-  onOpenDryRunModal,
   onExportCSV,
   emailOutbox,
   pushToast,
 }) {
-  const [subTab, setSubTab] = useState('import');
+  const [subTab, setSubTab] = useState('lines');
   const [newPlName, setNewPlName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserName, setNewUserName] = useState('');
@@ -6189,10 +6184,9 @@ function SettingsView({
     <div className="space-y-4">
       <div className="circuit-strip flex flex-wrap items-center gap-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs p-2 rounded-2xl border border-stone-200 dark:border-slate-800">
         {[
-          { id: 'import', label: '1. Excel Import (17 Rules)', icon: FileSpreadsheet },
-          { id: 'lines', label: '2. Projects & Products (Drag to Reorder)', icon: Layers },
-          { id: 'users', label: '3. Users & Roles', icon: Users },
-          { id: 'notifications', label: '4. Email delivery', icon: Mail },
+          { id: 'lines', label: '1. Projects & Products (Drag to Reorder)', icon: Layers },
+          { id: 'users', label: '2. Users & Roles', icon: Users },
+          { id: 'notifications', label: '3. Email delivery', icon: Mail },
         ].map((t) => {
           const Icon = t.icon;
           return (
@@ -6211,28 +6205,6 @@ function SettingsView({
           );
         })}
       </div>
-
-      {subTab === 'import' && (
-        <div className="circuit-card bg-white/95 dark:bg-slate-900/95 p-6 rounded-2xl border border-stone-200 dark:border-slate-800 space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h3 className="text-base font-bold">Excel Workbook Importer (`Communication_TeaM_Test_updated.xlsx`)</h3>
-              <p className="text-xs text-slate-500">
-                Implements all 17 import rules + Friday & Saturday weekend exclusion + Planned/Actual Days.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onOpenDryRunModal}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs"
-              >
-                <Eye className="w-4 h-4" />
-                <span>Open Dry-Run Review Report (175 Tasks)</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {subTab === 'lines' && (
         <div className="circuit-card bg-white/95 dark:bg-slate-900/95 p-6 rounded-2xl border border-stone-200 dark:border-slate-800 space-y-4">

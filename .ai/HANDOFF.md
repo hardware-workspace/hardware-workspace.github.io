@@ -1,5 +1,9 @@
 # Latest handoff
 
+## 25 November 2026 — Remove Excel Workbook Importer section from Settings
+
+Removed the `Excel Workbook Importer` (`Communication_TeaM_Test_updated.xlsx`) / `Open Dry-Run Review Report (175 Tasks)` card and its `1. Excel Import (17 Rules)` sub-tab from `SettingsView` in `src/App.tsx`, defaulting `subTab` to `'lines'` and renumbering the remaining Settings sub-tabs (`1. Projects & Products`, `2. Users & Roles`, `3. Email delivery`). `npm run check:focused` and `npm run build` passed.
+
 ## 18 November 2026 — Notification bell popover visible again
 
 The bell's dropdown never appeared because the top `<header className="workspace-header …">` in `src/App.tsx` carried `overflow-hidden` (added with the circuit-board banner in `e2bbb80`), which clipped the absolutely positioned popover that hangs below the header. Removed `overflow-hidden` from the header (both decorative banner layers use `inset-y-0` and stay inside it) and added `top-full` to `.notification-popover` so it anchors directly under the bell instead of the wrapper's static position. Mobile styling (`position: fixed; top: 110px`) in `src/index.css` still overrides it. `npm run check:focused` and `npm run build` passed. Commit `3402446` was pushed to `main`; `npm run deploy:verify` confirmed production serves that commit and its JavaScript entrypoint.
